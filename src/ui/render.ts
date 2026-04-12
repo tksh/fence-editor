@@ -223,7 +223,9 @@ function padRight(s: string, width: number): string {
   return s + " ".repeat(width - s.length);
 }
 
-// Re-export Action and generateValidActions for consumers (loop.ts)
+/**
+ * Re-export Action and generateValidActions for consumers (loop.ts)
+ */
 export { generateValidActions, type Action };
 
 /**
@@ -245,6 +247,11 @@ export function renderActions(actions: Action[]): void {
       );
     }
   }
+
+  // Persistent hint footer (within 80 chars)
+  Deno.stdout.writeSync(
+    out(`\n  ${DIM}> Enter action # | 0 or q to exit & save | Ctrl+C to cancel${RESET}\n`),
+  );
 }
 
 /**

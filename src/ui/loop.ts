@@ -3,6 +3,9 @@
  *
  * Renders the UI, reads user input, applies actions via applyAction(),
  * and returns the chosen output destination on exit.
+ *
+ * Ctrl+C is handled cleanly: SIGINT listener exits immediately without
+ * triggering the save flow or throwing unhandled errors.
  */
 
 import type { EditorState } from "../model/state.ts";
@@ -13,6 +16,7 @@ import {
   renderGoodbye,
   renderError,
   generateValidActions,
+  clearScreen,
 } from "./render.ts";
 import { readLine } from "../runtime.ts";
 
@@ -31,6 +35,13 @@ export type OutputDestination = "save-new" | "overwrite" | "stdout";
 export async function runInteractiveLoop(
   initialState: EditorState,
 ): Promise<{ state: EditorState; destination: OutputDestination }> {
+  // Clean Ctrl+C handling: abort immediately without saving
+  Deno.addSignalListener("SIGINT", () => {
+    clearScreen();
+    renderGoodbye();
+    Deno.exit(0);
+  });
+
   let state = initialState;
 
   while (true) {
@@ -46,11 +57,9 @@ export async function runInteractiveLoop(
       break;
     }
 
-    // Parse action number
+    // Empty or non-numeric input: silently re-prompt (no error noise)
     const choice = parseInt(trimmed, 10);
     if (isNaN(choice) || choice < 1) {
-      renderError("Invalid input. Enter a number or '0'/'q' to exit.");
-      await waitEnter();
       continue;
     }
 
