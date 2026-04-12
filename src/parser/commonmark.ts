@@ -82,8 +82,9 @@ function extractFence(line: string, lineNum: number): FenceToken | null {
   const infoCandidate = afterFence.trim();
   const infostring = infoCandidate.length > 0 ? infoCandidate : null;
 
-  // Determine kind: infostring present → forced open; otherwise tentative
-  const kind: "open" | "close" = infostring !== null ? "open" : "open";
+  // Determine kind: infostring present → forced open; otherwise tentative close
+  // (pairFences will re-determine: if stack has open, this closes it; else it opens)
+  const kind: "open" | "close" = infostring !== null ? "open" : "close";
 
   return {
     line: lineNum,

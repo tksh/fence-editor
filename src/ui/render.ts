@@ -15,12 +15,20 @@
  * Total content: 6 + 22 + 4 + 4 + 22 = 58
  * Pipes + spaces: 5 pipes + 8 spaces = 13
  * Total: 58 + 13 = 71 (within 80-char limit)
+ *
+ * The output column renders state.outputTokens[i].raw directly.
+ * The O. column renders state.outputTokens[i].pairId directly.
+ * Redraw always uses state.outputTokens — no separate UI state array.
  */
 
-import type { FenceToken } from "../model/fence.ts";
 import type { EditorState } from "../model/state.ts";
+import {
+  generateValidActions,
+  type Action,
+  getOutputPairs,
+} from "../model/state.ts";
+import type { FenceToken } from "../model/fence.ts";
 import { truncate } from "../model/fence.ts";
-import { getOutputPairs } from "../model/state.ts";
 
 const COL_LINE_W = 6;
 const COL_INPUT_W = 22;
@@ -58,7 +66,7 @@ export function render(state: EditorState): void {
 
   renderTerms();
   renderStatusTable(state);
-  const actions = generateActions(state);
+  const actions = generateValidActions(state);
   renderActions(actions);
   renderPrompt();
 }
@@ -82,6 +90,10 @@ function renderTerms(): void {
 
 /**
  * Render the Status table with input and output columns side by side.
+ *
+ * - "output" column renders state.outputTokens[i].raw (truncated to 22 chars).
+ * - "O." column renders state.outputTokens[i].pairId.
+ * - All data comes from state.outputTokens directly — no separate UI array.
  */
 function renderStatusTable(state: EditorState): void {
   // Header
@@ -98,11 +110,11 @@ function renderStatusTable(state: EditorState): void {
   const sep = formatSeparator();
   Deno.stdout.writeSync(out(sep + "\n"));
 
-  // Build a map of input tokens by line
+  // Build maps from line number to FenceToken
   const inputMap = buildTokenMap(state.inputTokens);
   const outputMap = buildTokenMap(state.outputTokens);
 
-  // All unique line numbers that have fences (from input)
+  // All unique line numbers that have fences
   const allLines = new Set<number>();
   for (const t of state.inputTokens) allLines.add(t.line);
   for (const t of state.outputTokens) allLines.add(t.line);
@@ -117,12 +129,16 @@ function renderStatusTable(state: EditorState): void {
     const inputId = inputToken && inputToken.pairId > 0
       ? String(inputToken.pairId)
       : "";
+
+    // O. column: reads directly from state.outputTokens[i].pairId
     const outputId = outputToken && outputToken.pairId > 0
       ? String(outputToken.pairId)
       : "";
+
+    // output column: reads directly from state.outputTokens[i].raw
     const outputRaw = outputToken
       ? truncate(outputToken.raw, COL_OUTPUT_W)
-      : inputRaw; // If no output token, show input
+      : "";
 
     const row = formatRow(
       lineStr,
@@ -132,6 +148,19 @@ function renderStatusTable(state: EditorState): void {
       outputRaw,
     );
     Deno.stdout.writeSync(out(row + "\n"));
+  }
+
+  // Render pair summary
+  const pairs = getOutputPairs(state.outputTokens);
+  if (pairs.length > 0) {
+    Deno.stdout.writeSync(out("\n"));
+    for (const pair of pairs) {
+      Deno.stdout.writeSync(
+        out(
+          `  ${GREEN}O.${pair.id}${RESET}: line ${pair.open.line} → line ${pair.close.line} (${pair.open.symbol}, ${pair.open.backtickCount}x)\n`,
+        ),
+      );
+    }
   }
 }
 
@@ -148,8 +177,6 @@ function buildTokenMap(tokens: ReadonlyArray<FenceToken>): Map<number, FenceToke
 
 /**
  * Format a table row with proper column widths and alignment.
- * Layout: | line | input                | I. | O. | output               |
- *         |-----:|:---------------------|---:|---:|:---------------------|
  */
 function formatRow(
   line: string,
@@ -196,99 +223,17 @@ function padRight(s: string, width: number): string {
   return s + " ".repeat(width - s.length);
 }
 
-/** An action the user can take, with a display label. */
-export interface Action {
-  id: number;
-  label: string;
-  type: "restructure" | "increase-backtick" | "convert-tilde";
-  /** For restructure actions: the pairId and new close line */
-  pairId?: number;
-  newCloseLine?: number;
-}
-
-/**
- * Generate the list of available actions from the current state.
- *
- * Actions:
- * 1. Restructure: for each pair, offer changing its close fence to another
- *    open fence's line (from a different pair).
- * 2. Increase backtick count: if nesting rule is violated.
- * 3. Convert tildes to backticks (conditional on hasTilde).
- */
-export function generateActions(state: EditorState): Action[] {
-  const actions: Action[] = [];
-
-  // 1. Restructure actions: for each pair, show alternative close fences
-  const pairs = getOutputPairs(state.outputTokens);
-  const allFences = state.outputTokens.filter((t) => t.kind === "open");
-
-  for (const pair of pairs) {
-    // Find alternative close candidates: any open fence that comes after the current close
-    for (const alt of allFences) {
-      if (alt.pairId === pair.id) continue; // Skip same pair
-      if (alt.line <= pair.close.line) continue; // Must be after current close
-      // Check that this line isn't already used as a close by another pair
-      const alreadyClose = state.outputTokens.find(
-        (t) => t.line === alt.line && t.kind === "close",
-      );
-      if (alreadyClose) continue;
-
-      actions.push({
-        id: 0, // Will be assigned by renderActions
-        label: `Change close fence for O.${pair.id} from line ${pair.close.line} to line ${alt.line}`,
-        type: "restructure",
-        pairId: pair.id,
-        newCloseLine: alt.line,
-      });
-    }
-  }
-
-  // 2. Check for nesting violations (backtick count)
-  const pairs2 = getOutputPairs(state.outputTokens);
-  for (const outer of pairs2) {
-    if (outer.open.symbol !== "backtick") continue;
-    for (const inner of pairs2) {
-      if (inner.id === outer.id) continue;
-      if (inner.open.symbol !== "backtick") continue;
-      if (
-        inner.open.line > outer.open.line &&
-        inner.close.line < outer.close.line
-      ) {
-        if (outer.open.backtickCount <= inner.open.backtickCount) {
-          actions.push({
-            id: 0,
-            label: `Increase backtick count for O.${outer.id} (need ${inner.open.backtickCount + 1}, have ${outer.open.backtickCount})`,
-            type: "increase-backtick",
-            pairId: outer.id,
-          });
-        }
-      }
-    }
-  }
-
-  // 3. Convert tilde to backticks (if any tildes exist)
-  if (state.hasTilde) {
-    actions.push({
-      id: 0,
-      label: "Convert tilde fences to backticks",
-      type: "convert-tilde",
-    });
-  }
-
-  // Assign sequential IDs
-  for (let i = 0; i < actions.length; i++) {
-    actions[i].id = i + 1;
-  }
-
-  return actions;
-}
+// Re-export Action and generateValidActions for consumers (loop.ts)
+export { generateValidActions, type Action };
 
 /**
  * Render the Actions section with numbered choices.
  */
 export function renderActions(actions: Action[]): void {
   Deno.stdout.writeSync(out("\n"));
-  Deno.stdout.writeSync(out(`${BOLD}Actions (enter number to apply):${RESET}\n`));
+  Deno.stdout.writeSync(
+    out(`${BOLD}Actions (enter number to apply):${RESET}\n`),
+  );
   Deno.stdout.writeSync(out("\n"));
 
   if (actions.length === 0) {

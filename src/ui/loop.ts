@@ -1,22 +1,18 @@
 /**
  * Main interactive loop and input handling.
  *
- * Renders the UI, reads user input, applies actions to EditorState,
+ * Renders the UI, reads user input, applies actions via applyAction(),
  * and returns the chosen output destination on exit.
  */
 
 import type { EditorState } from "../model/state.ts";
-import {
-  restructureClose,
-  convertTildesToBackticks,
-} from "../model/state.ts";
+import { applyAction } from "../model/state.ts";
 import {
   render,
   renderOutputSelector,
   renderGoodbye,
   renderError,
-  generateActions,
-  type Action,
+  generateValidActions,
 } from "./render.ts";
 import { readLine } from "../runtime.ts";
 
@@ -27,7 +23,8 @@ export type OutputDestination = "save-new" | "overwrite" | "stdout";
  * Run the interactive editing loop.
  *
  * Displays the status table and actions, reads user input,
- * applies actions, and repeats until the user exits.
+ * applies actions via applyAction (which mutates outputTokens properly),
+ * and repeats until the user exits.
  *
  * Returns both the modified EditorState and the chosen output destination.
  */
@@ -35,6 +32,7 @@ export async function runInteractiveLoop(
   initialState: EditorState,
 ): Promise<{ state: EditorState; destination: OutputDestination }> {
   let state = initialState;
+
   while (true) {
     // Render the full UI
     render(state);
@@ -56,8 +54,8 @@ export async function runInteractiveLoop(
       continue;
     }
 
-    // Find the matching action
-    const actions = generateActions(state);
+    // Look up the action in the current valid actions list
+    const actions = generateValidActions(state);
     const action = actions.find((a) => a.id === choice);
     if (!action) {
       renderError(`No action with number ${choice}.`);
@@ -65,30 +63,10 @@ export async function runInteractiveLoop(
       continue;
     }
 
-    // Apply the action
-    switch (action.type) {
-      case "restructure": {
-        if (action.pairId === undefined || action.newCloseLine === undefined) {
-          renderError("Invalid restructure action.");
-          await waitEnter();
-          continue;
-        }
-        state = restructureClose(state, action.pairId, action.newCloseLine);
-        break;
-      }
-      case "convert-tilde": {
-        state = convertTildesToBackticks(state);
-        break;
-      }
-      case "increase-backtick": {
-        // This is informational — the auto-adjust already handles it.
-        // We apply a manual +1 increase if requested.
-        if (action.pairId !== undefined) {
-          state = increaseBacktickCount(state, action.pairId);
-        }
-        break;
-      }
-    }
+    // Apply the action — this mutates outputTokens properly:
+    // updates kind, pairId, backtickCount, regenerates raw strings,
+    // and appends to actionLog.
+    state = applyAction(state, choice);
   }
 
   // Show output destination selector
@@ -104,29 +82,6 @@ export async function runInteractiveLoop(
 
     renderError("Invalid choice. Enter 1, 2, or 3.");
   }
-}
-
-/**
- * Increase the backtick count for all fences in a given pair by 1.
- */
-function increaseBacktickCount(state: EditorState, pairId: number): EditorState {
-  const newTokens = state.outputTokens.map((t) => {
-    if (t.pairId === pairId) {
-      return {
-        ...t,
-        backtickCount: t.backtickCount + 1,
-      };
-    }
-    return { ...t };
-  });
-  return {
-    ...state,
-    outputTokens: newTokens,
-    actionLog: [
-      ...state.actionLog,
-      `Increased backtick count for O.${pairId}`,
-    ],
-  };
 }
 
 /**

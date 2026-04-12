@@ -6,7 +6,9 @@
  * 2. Read source (from file or stdin).
  * 3. Parse fences using the selected format's parser.
  * 4. Create EditorState and run the interactive loop.
- * 5. On exit from loop, handle output destination (save/overwrite/stdout).
+ * 5. On exit, reconstruct output by replacing fence lines in original source
+ *    with the updated token.raw from outputTokens.
+ * 6. Handle output destination (save/overwrite/stdout).
  */
 
 import { parseArgs, getVersion, getHelpText } from "./args.ts";
@@ -14,7 +16,7 @@ import { getArgs, readStdin, readLine, exit, writeFile } from "./runtime.ts";
 import { parseCommonMark } from "./parser/commonmark.ts";
 import { parseDjot } from "./parser/djot.ts";
 import type { FenceParser } from "./model/fence.ts";
-import { createEditorState, reconstructSource } from "./model/state.ts";
+import { createEditorState, reconstructOutput } from "./model/state.ts";
 import {
   runInteractiveLoop,
   type OutputDestination,
@@ -55,6 +57,9 @@ async function main(): Promise<void> {
     }
   }
 
+  // Preserve original lines for output reconstruction
+  const originalLines = source.split("\n");
+
   // 3. Select parser
   const parser: FenceParser = parsed.format === "djot"
     ? parseDjot
@@ -73,8 +78,9 @@ async function main(): Promise<void> {
   // 5. Run interactive loop — returns the modified state and destination
   const { state: finalState, destination } = await runInteractiveLoop(state);
 
-  // 6. Reconstruct the output source
-  const output = reconstructSource(source, finalState.outputTokens);
+  // 6. Reconstruct output: iterate originalLines, replace fence lines with
+  //    the updated token.raw from finalState.outputTokens
+  const output = reconstructOutput(finalState.outputTokens, originalLines);
 
   // 7. Handle output destination
   await handleOutput(destination, output, inputFile);
