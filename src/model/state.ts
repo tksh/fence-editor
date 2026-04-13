@@ -328,21 +328,23 @@ export function generateValidActions(state: EditorState): Action[] {
     }
   }
 
-  // 3. Backtick increase actions: detect nesting violations
+  // 3. Increase fence count actions: detect nesting violations per symbol type
   for (const outer of pairs) {
-    if (outer.open.symbol !== "backtick") continue;
     for (const inner of pairs) {
       if (inner.id === outer.id) continue;
-      if (inner.open.symbol !== "backtick") continue;
+      if (inner.open.symbol !== outer.open.symbol) continue;
       if (
         inner.open.line > outer.open.line &&
         inner.close.line < outer.close.line
       ) {
         if (outer.open.backtickCount <= inner.open.backtickCount) {
+          const symLabel = outer.open.symbol === "backtick"
+            ? "backtick"
+            : "tilde";
           actions.push({
             id: 0,
             label:
-              `Increase backtick count for O.${outer.id} (need ${inner.open.backtickCount + 1}, have ${outer.open.backtickCount})`,
+              `Increase ${symLabel} count for O.${outer.id} (need ${inner.open.backtickCount + 1}, have ${outer.open.backtickCount})`,
             type: "increase-backtick",
             pairId: outer.id,
           });
@@ -487,11 +489,11 @@ function applyIncreaseBacktick(
   const outer = pairs.find((p) => p.id === pairId);
   if (!outer) return state;
 
-  // Find the maximum required backtick count from nested inner fences
+  // Find the maximum required fence count from nested inner fences (same symbol)
   let required = outer.open.backtickCount;
   for (const inner of pairs) {
     if (inner.id === outer.id) continue;
-    if (inner.open.symbol !== "backtick") continue;
+    if (inner.open.symbol !== outer.open.symbol) continue;
     if (
       inner.open.line > outer.open.line &&
       inner.close.line < outer.close.line
@@ -624,21 +626,23 @@ export function getOutputPairs(tokens: FenceToken[]): FencePairInfo[] {
 // ─── Auto-Adjust Backticks ──────────────────────────────────────
 
 /**
- * Auto-adjust backtick counts to satisfy the nesting rule:
+ * Auto-adjust fence counts to satisfy the nesting rule:
  * outer fence backtickCount must be >= inner fence backtickCount + 1.
  *
- * Regenerates raw strings after adjustment.
+ * Applies per symbol type: only adjusts when both outer and inner use
+ * the same symbol (backtick-backtick or tilde-tilde). Does not mix symbols.
+ *
+ * Regenerates raw strings for ALL tokens after adjustment.
  */
 export function autoAdjustBackticks(tokens: FenceToken[]): FenceToken[] {
   const result = tokens.map((t) => ({ ...t }));
   const pairs = getOutputPairs(result);
 
   for (const outer of pairs) {
-    if (outer.open.symbol !== "backtick") continue;
-
     for (const inner of pairs) {
       if (inner.id === outer.id) continue;
-      if (inner.open.symbol !== "backtick") continue;
+      // Only adjust within the same symbol type
+      if (inner.open.symbol !== outer.open.symbol) continue;
 
       if (
         inner.open.line > outer.open.line &&
