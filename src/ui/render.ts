@@ -82,6 +82,7 @@ function renderTerms(): void {
     `  O. = fence pair id (output)`,
     "",
     `${BOLD}Status:${RESET}`,
+    "",
   ];
   for (const line of lines) {
     Deno.stdout.writeSync(out(line + "\n"));
