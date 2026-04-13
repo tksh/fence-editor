@@ -18,13 +18,18 @@ export interface EditorState {
   outputTokens: FenceToken[];
   hasTilde: boolean;
   actionLog: string[];
+  /** Parser format used: "commonmark" or "djot" */
+  format: "commonmark" | "djot";
 }
 
-export function createEditorState(tokens: FenceToken[]): EditorState {
+export function createEditorState(
+  tokens: FenceToken[],
+  format: "commonmark" | "djot" = "commonmark",
+): EditorState {
   const inputTokens = Object.freeze(tokens.map((t) => ({ ...t })));
   const outputTokens = tokens.map((t) => ({ ...t }));
   const hasTilde = tokens.some((t) => t.symbol === "tilde");
-  return { inputTokens, outputTokens, hasTilde, actionLog: [] };
+  return { inputTokens, outputTokens, hasTilde, actionLog: [], format };
 }
 
 // ─── Pure Pairing Function ──────────────────────────────────────

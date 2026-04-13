@@ -73,7 +73,7 @@ async function main(): Promise<void> {
     exit(1);
   }
 
-  const state = createEditorState(tokens);
+  const state = createEditorState(tokens, parsed.format);
 
   // 5. Run interactive loop — returns the modified state and destination
   const { state: finalState, destination } = await runInteractiveLoop(state);

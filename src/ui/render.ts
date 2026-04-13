@@ -59,12 +59,12 @@ export function clearScreen(): void {
 }
 
 /**
- * Render the complete UI: Terms, Status table, Actions, and prompt.
+ * Render the complete UI: Terms, format indicator, Status table, Actions, and prompt.
  */
 export function render(state: EditorState): void {
   clearScreen();
 
-  renderTerms();
+  renderTerms(state);
   renderStatusTable(state);
   const actions = generateValidActions(state);
   renderActions(actions);
@@ -72,14 +72,17 @@ export function render(state: EditorState): void {
 }
 
 /**
- * Render the Terms section explaining I. and O. notation.
+ * Render the Terms section explaining I. and O. notation, plus the parser format.
  */
-function renderTerms(): void {
+function renderTerms(state: EditorState): void {
+  const formatLabel = state.format === "djot" ? "Djot" : "CommonMark";
   const lines = [
     `${BOLD}Terms:${RESET}`,
     "",
     `  I. = fence pair id (input)`,
     `  O. = fence pair id (output)`,
+    "",
+    `Parsed as ${formatLabel}`,
     "",
     `${BOLD}Status:${RESET}`,
     "",
@@ -235,7 +238,7 @@ export { generateValidActions, type Action };
 export function renderActions(actions: Action[]): void {
   Deno.stdout.writeSync(out("\n"));
   Deno.stdout.writeSync(
-    out(`${BOLD}Actions (enter number to apply):${RESET}\n`),
+    out(`${BOLD}Actions:${RESET}\n`),
   );
   Deno.stdout.writeSync(out("\n"));
 
