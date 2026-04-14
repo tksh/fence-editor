@@ -1,6 +1,13 @@
 /**
  * Status table and Actions rendering using ANSI escape sequences.
  *
+ * ALL UI output goes to stderr. This separates interactive UI from the
+ * data stream, enabling clean stdout piping:
+ *
+ *   cat file.md | deno run ... | grep "code"
+ *
+ * Only the reconstructed file content (destination [3]) writes to stdout.
+ *
  * Layout (total ≤ 80 chars):
  * | line | input                | I. | O. | output               |
  * |-----:|:---------------------|---:|---:|:---------------------|
@@ -53,13 +60,15 @@ function out(s: string): Uint8Array {
 
 /**
  * Clear the screen and move cursor to top-left.
+ * Written to stderr — the interactive terminal display.
  */
 export function clearScreen(): void {
-  Deno.stdout.writeSync(out(CLEAR_SCREEN));
+  Deno.stderr.writeSync(out(CLEAR_SCREEN));
 }
 
 /**
  * Render the complete UI: Terms, format indicator, Status table, Actions, and prompt.
+ * All UI goes to stderr.
  */
 export function render(state: EditorState): void {
   clearScreen();
@@ -73,6 +82,7 @@ export function render(state: EditorState): void {
 
 /**
  * Render the Terms section explaining I. and O. notation, plus the parser format.
+ * Written to stderr.
  */
 function renderTerms(state: EditorState): void {
   const formatLabel = state.format === "djot" ? "Djot" : "CommonMark";
@@ -88,12 +98,13 @@ function renderTerms(state: EditorState): void {
     "",
   ];
   for (const line of lines) {
-    Deno.stdout.writeSync(out(line + "\n"));
+    Deno.stderr.writeSync(out(line + "\n"));
   }
 }
 
 /**
  * Render the Status table with input and output columns side by side.
+ * Written to stderr.
  *
  * - "output" column renders state.outputTokens[i].raw (truncated to 22 chars).
  * - "O." column renders state.outputTokens[i].pairId.
@@ -108,11 +119,11 @@ function renderStatusTable(state: EditorState): void {
     "O.",
     "output",
   );
-  Deno.stdout.writeSync(out(header + "\n"));
+  Deno.stderr.writeSync(out(header + "\n"));
 
   // Separator
   const sep = formatSeparator();
-  Deno.stdout.writeSync(out(sep + "\n"));
+  Deno.stderr.writeSync(out(sep + "\n"));
 
   // Build maps from line number to FenceToken
   const inputMap = buildTokenMap(state.inputTokens);
@@ -151,15 +162,15 @@ function renderStatusTable(state: EditorState): void {
       outputId,
       outputRaw,
     );
-    Deno.stdout.writeSync(out(row + "\n"));
+    Deno.stderr.writeSync(out(row + "\n"));
   }
 
   // Render pair summary
   const pairs = getOutputPairs(state.outputTokens);
   if (pairs.length > 0) {
-    Deno.stdout.writeSync(out("\n"));
+    Deno.stderr.writeSync(out("\n"));
     for (const pair of pairs) {
-      Deno.stdout.writeSync(
+      Deno.stderr.writeSync(
         out(
           `  ${GREEN}O.${pair.id}${RESET}: line ${pair.open.line} → line ${pair.close.line} (${pair.open.symbol}, ${pair.open.backtickCount}x)\n`,
         ),
@@ -234,63 +245,68 @@ export { generateValidActions, type Action };
 
 /**
  * Render the Actions section with numbered choices.
+ * Written to stderr.
  */
 export function renderActions(actions: Action[]): void {
-  Deno.stdout.writeSync(out("\n"));
-  Deno.stdout.writeSync(
+  Deno.stderr.writeSync(out("\n"));
+  Deno.stderr.writeSync(
     out(`${BOLD}Actions:${RESET}\n`),
   );
-  Deno.stdout.writeSync(out("\n"));
+  Deno.stderr.writeSync(out("\n"));
 
   if (actions.length === 0) {
-    Deno.stdout.writeSync(out("  No actions available.\n"));
+    Deno.stderr.writeSync(out("  No actions available.\n"));
   } else {
     for (const action of actions) {
-      Deno.stdout.writeSync(
+      Deno.stderr.writeSync(
         out(`  ${YELLOW}[${action.id}]${RESET} ${action.label}\n`),
       );
     }
   }
 
   // Persistent hint footer (within 80 chars)
-  Deno.stdout.writeSync(
+  Deno.stderr.writeSync(
     out(`\n  ${DIM}> Enter action # | 0 or q to exit & save | Ctrl+C to cancel${RESET}\n`),
   );
 }
 
 /**
  * Render the input prompt.
+ * Written to stderr.
  */
 export function renderPrompt(): void {
-  Deno.stdout.writeSync(out("\n"));
-  Deno.stdout.writeSync(out(`${CYAN}>${RESET} `));
+  Deno.stderr.writeSync(out("\n"));
+  Deno.stderr.writeSync(out(`${CYAN}>${RESET} `));
 }
 
 /**
  * Render the output destination selector.
+ * Written to stderr.
  */
 export function renderOutputSelector(): void {
-  Deno.stdout.writeSync(out("\n"));
-  Deno.stdout.writeSync(out(`${BOLD}Choose output destination:${RESET}\n`));
-  Deno.stdout.writeSync(out("\n"));
-  Deno.stdout.writeSync(out("  [1] Save as new file\n"));
-  Deno.stdout.writeSync(out("  [2] Overwrite input file\n"));
-  Deno.stdout.writeSync(out("  [3] Print to stdout\n"));
-  Deno.stdout.writeSync(out("\n"));
-  Deno.stdout.writeSync(out(`${CYAN}>${RESET} `));
+  Deno.stderr.writeSync(out("\n"));
+  Deno.stderr.writeSync(out(`${BOLD}Choose output destination:${RESET}\n`));
+  Deno.stderr.writeSync(out("\n"));
+  Deno.stderr.writeSync(out("  [1] Save as new file\n"));
+  Deno.stderr.writeSync(out("  [2] Overwrite input file\n"));
+  Deno.stderr.writeSync(out("  [3] Print to stdout\n"));
+  Deno.stderr.writeSync(out("\n"));
+  Deno.stderr.writeSync(out(`${CYAN}>${RESET} `));
 }
 
 /**
  * Render a goodbye message.
+ * Written to stderr.
  */
 export function renderGoodbye(): void {
-  Deno.stdout.writeSync(out("\n"));
-  Deno.stdout.writeSync(out(`${DIM}Goodbye.${RESET}\n`));
+  Deno.stderr.writeSync(out("\n"));
+  Deno.stderr.writeSync(out(`${DIM}Goodbye.${RESET}\n`));
 }
 
 /**
  * Render an error message.
+ * Written to stderr.
  */
 export function renderError(msg: string): void {
-  Deno.stdout.writeSync(out(`\n\x1b[31mError: ${msg}\x1b[0m\n`));
+  Deno.stderr.writeSync(out(`\n\x1b[31mError: ${msg}\x1b[0m\n`));
 }

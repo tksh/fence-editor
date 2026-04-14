@@ -9,6 +9,10 @@
  * 5. On exit, reconstruct output by replacing fence lines in original source
  *    with the updated token.raw from outputTokens.
  * 6. Handle output destination (save/overwrite/stdout).
+ *
+ * Strict stream separation:
+ * - ALL UI (tables, prompts, errors, goodbye) → stderr
+ * - ONLY reconstructed file content (destination [3]) → stdout
  */
 
 import { parseArgs, getVersion, getHelpText } from "./args.ts";
@@ -29,12 +33,12 @@ async function main(): Promise<void> {
   const parsed = parseArgs(argv);
 
   if (parsed.showVersion) {
-    console.log(getVersion());
+    Deno.stderr.writeSync(new TextEncoder().encode(getVersion() + "\n"));
     exit(0);
   }
 
   if (parsed.showHelp) {
-    console.log(getHelpText());
+    Deno.stderr.writeSync(new TextEncoder().encode(getHelpText() + "\n"));
     exit(0);
   }
 
@@ -46,13 +50,21 @@ async function main(): Promise<void> {
     try {
       source = await Deno.readTextFile(parsed.inputFile);
     } catch (err) {
-      console.error(`Error: Cannot read file "${parsed.inputFile}": ${err}`);
+      Deno.stderr.writeSync(
+        new TextEncoder().encode(
+          `Error: Cannot read file "${parsed.inputFile}": ${err}\n`,
+        ),
+      );
       exit(1);
     }
   } else {
     source = await readStdin();
     if (source.length === 0) {
-      console.error("Error: No input provided. Use a file path or pipe stdin.");
+      Deno.stderr.writeSync(
+        new TextEncoder().encode(
+          "Error: No input provided. Use a file path or pipe stdin.\n",
+        ),
+      );
       exit(1);
     }
   }
@@ -69,7 +81,9 @@ async function main(): Promise<void> {
   const tokens = parser(source);
 
   if (tokens.length === 0) {
-    console.error("No code fences found in the input.");
+    Deno.stderr.writeSync(
+      new TextEncoder().encode("No code fences found in the input.\n"),
+    );
     exit(1);
   }
 
@@ -90,6 +104,9 @@ async function main(): Promise<void> {
 
 /**
  * Handle the output based on user's destination choice.
+ *
+ * ONLY destination [3] "stdout" writes to DENO.STDOUT.
+ * All other messages (goodbye, errors, confirmations) go to STDERR.
  */
 async function handleOutput(
   destination: OutputDestination,
@@ -98,9 +115,9 @@ async function handleOutput(
 ): Promise<void> {
   switch (destination) {
     case "stdout": {
-      clearScreen();
-      renderGoodbye();
-      console.log(output);
+      // Write ONLY the file content to stdout — no ANSI codes, no UI text
+      const encoder = new TextEncoder();
+      Deno.stdout.writeSync(encoder.encode(output + "\n"));
       break;
     }
     case "overwrite": {
@@ -115,7 +132,9 @@ async function handleOutput(
       clearScreen();
       renderGoodbye();
       await writeFile(inputFile, output);
-      console.log(`Saved to ${inputFile}`);
+      Deno.stderr.writeSync(
+        new TextEncoder().encode(`Saved to ${inputFile}\n`),
+      );
       break;
     }
     case "save-new": {
@@ -125,13 +144,15 @@ async function handleOutput(
       const defaultName = inputFile
         ? inputFile.replace(/\.[^.]+$/, "") + "_edited.md"
         : "output.md";
-      Deno.stdout.write(
+      Deno.stderr.writeSync(
         new TextEncoder().encode(`Enter file path [${defaultName}]: `),
       );
       const pathInput = await readLine();
       const filePath = pathInput.trim() || defaultName;
       await writeFile(filePath, output);
-      console.log(`Saved to ${filePath}`);
+      Deno.stderr.writeSync(
+        new TextEncoder().encode(`Saved to ${filePath}\n`),
+      );
       break;
     }
   }
