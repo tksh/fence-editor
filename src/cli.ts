@@ -15,7 +15,13 @@
  * - ONLY reconstructed file content (destination [3]) → stdout
  */
 
-import { parseArgs, getVersion, getHelpText } from "./args.ts";
+import {
+  parseArgs,
+  getVersion,
+  getHelpText,
+  resolveFormat,
+  generateDefaultOutputPath,
+} from "./args.ts";
 import { getArgs, readStdin, readLine, exit, writeFile } from "./runtime.ts";
 import { parseCommonMark } from "./parser/commonmark.ts";
 import { parseDjot } from "./parser/djot.ts";
@@ -69,11 +75,14 @@ async function main(): Promise<void> {
     }
   }
 
+  // Resolve format: explicit flag > auto-detect from extension > commonmark
+  const resolvedFormat = resolveFormat(inputFile, parsed.explicitFormat);
+
   // Preserve original lines for output reconstruction
   const originalLines = source.split("\n");
 
   // 3. Select parser
-  const parser: FenceParser = parsed.format === "djot"
+  const parser: FenceParser = resolvedFormat === "djot"
     ? parseDjot
     : parseCommonMark;
 
@@ -87,7 +96,7 @@ async function main(): Promise<void> {
     exit(1);
   }
 
-  const state = createEditorState(tokens, parsed.format);
+  const state = createEditorState(tokens, resolvedFormat);
 
   // 5. Run interactive loop — returns the modified state and destination
   const { state: finalState, destination } = await runInteractiveLoop(state);
@@ -97,7 +106,7 @@ async function main(): Promise<void> {
   const output = reconstructOutput(finalState.outputTokens, originalLines);
 
   // 7. Handle output destination
-  await handleOutput(destination, output, inputFile);
+  await handleOutput(destination, output, inputFile, resolvedFormat);
 
   exit(0);
 }
@@ -112,6 +121,7 @@ async function handleOutput(
   destination: OutputDestination,
   output: string,
   inputFile: string | null,
+  format: "commonmark" | "djot",
 ): Promise<void> {
   switch (destination) {
     case "stdout": {
@@ -140,10 +150,8 @@ async function handleOutput(
     case "save-new": {
       clearScreen();
       renderGoodbye();
-      // Prompt for new file path
-      const defaultName = inputFile
-        ? inputFile.replace(/\.[^.]+$/, "") + "_edited.md"
-        : "output.md";
+      // Format-aware default output path
+      const defaultName = generateDefaultOutputPath(inputFile, format);
       Deno.stderr.writeSync(
         new TextEncoder().encode(`Enter file path [${defaultName}]: `),
       );
