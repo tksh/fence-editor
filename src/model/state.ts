@@ -20,6 +20,8 @@ export interface EditorState {
   actionLog: string[];
   /** Parser format used: "commonmark" or "djot" */
   format: "commonmark" | "djot";
+  /** Suppress restructure actions for one frame after tilde conversion */
+  skipRestructure: boolean;
 }
 
 export function createEditorState(
@@ -29,7 +31,7 @@ export function createEditorState(
   const inputTokens = Object.freeze(tokens.map((t) => ({ ...t })));
   const outputTokens = tokens.map((t) => ({ ...t }));
   const hasTilde = tokens.some((t) => t.symbol === "tilde");
-  return { inputTokens, outputTokens, hasTilde, actionLog: [], format };
+  return { inputTokens, outputTokens, hasTilde, actionLog: [], format, skipRestructure: false };
 }
 
 // ─── Pure Pairing Function ──────────────────────────────────────
@@ -39,7 +41,7 @@ export function createEditorState(
  * - infostring present → forced open
  * - kind="open" (explicit) → forced open (enables swap validation)
  * - no infostring + not explicit open → shortest-match stack pairing
- * - backtick and tilde treated independently
+ * - backtick and tilde treated independently with separate stacks
  * - pairIds are 1-based sequential
  *
  * Pure function: does not mutate input tokens.
@@ -67,7 +69,7 @@ export function pairFences(tokens: FenceToken[]): FenceToken[] {
         tok.kind = "open";
         stack.push(idx);
       } else if (tok.kind === "close") {
-        // Explicitly marked as close — try shortest-match
+        // Explicitly marked as close — try shortest-match with same-symbol stack
         if (stack.length > 0) {
           const openIdx = stack.pop()!;
           result[openIdx].kind = "open";
@@ -76,7 +78,7 @@ export function pairFences(tokens: FenceToken[]): FenceToken[] {
           tok.pairId = nextPairId;
           nextPairId++;
         } else {
-          // No matching open — treat as open
+          // No matching open on same-symbol stack → treat as open
           tok.kind = "open";
           stack.push(idx);
         }
@@ -90,7 +92,7 @@ export function pairFences(tokens: FenceToken[]): FenceToken[] {
           tok.pairId = nextPairId;
           nextPairId++;
         } else {
-          // No open to match — treat as open
+          // No open to match → treat as open
           tok.kind = "open";
           stack.push(idx);
         }
@@ -111,8 +113,8 @@ export function pairFences(tokens: FenceToken[]): FenceToken[] {
 export interface Action {
   id: number;
   label: string;
-  type: "restructure" | "increase-backtick" | "convert-tilde";
-  /** For restructure/increase-backtick: the target pairId */
+  type: "restructure" | "convert-tilde";
+  /** For restructure: the target pairId */
   pairId?: number;
   /** For restructure: the line number of the new close fence */
   newCloseLine?: number;
@@ -141,6 +143,49 @@ function structuresEqual(a: string[], b: string[]): boolean {
   return true;
 }
 
+// ─── Cross-Symbol Boundary Validation ───────────────────────────
+
+/**
+ * Detect whether any two pairs of DIFFERENT symbol types have crossing
+ * line ranges. A crossing occurs when one pair's open falls inside another
+ * pair's range but its close falls outside:
+ *
+ *   (A.open < B.open < A.close < B.close) ||
+ *   (B.open < A.open < B.close < A.close)
+ *
+ * Such structures are technically parseable (backtick/tilde are independent
+ * namespaces) but produce ambiguous, unreadable source. The tool blocks
+ * any restructure that would create them.
+ */
+export function hasCrossSymbolCrossing(tokens: FenceToken[]): boolean {
+  const pairs = getOutputPairs(tokens);
+
+  for (let i = 0; i < pairs.length; i++) {
+    for (let j = i + 1; j < pairs.length; j++) {
+      const A = pairs[i];
+      const B = pairs[j];
+
+      // Only check pairs of different symbol types
+      if (A.open.symbol === B.open.symbol) continue;
+
+      const aOpen = A.open.line;
+      const aClose = A.close.line;
+      const bOpen = B.open.line;
+      const bClose = B.close.line;
+
+      // Detect crossing: one open inside, its close outside the other's range
+      if (
+        (aOpen < bOpen && bOpen < aClose && aClose < bClose) ||
+        (bOpen < aOpen && aOpen < bClose && bClose < aClose)
+      ) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 // ─── Internal Helpers ───────────────────────────────────────────
 
 function findTokenIdx(
@@ -151,6 +196,10 @@ function findTokenIdx(
   return tokens.findIndex((t) => t.line === line && t.symbol === symbol);
 }
 
+/**
+ * Deep clone tokens. Each FenceToken is a fresh object with primitive
+ * properties only — shallow spread is sufficient.
+ */
 function cloneTokens(tokens: FenceToken[]): FenceToken[] {
   return tokens.map((t) => ({ ...t }));
 }
@@ -176,15 +225,16 @@ function simulatePairSwap(
   A: FencePairInfo,
   B: FencePairInfo,
 ): SwapResult {
-  // Must be same symbol type
+  // Must be same symbol type — different symbol stacks are independent
   if (A.open.symbol !== B.open.symbol) return { valid: false };
 
   // A must come before B
   if (A.close.line >= B.open.line) return { valid: false };
 
+  // Deep clone — no reference leaks
   const cloned = cloneTokens(tokens);
 
-  // Find the 4 tokens by line+symbol
+  // Find the 4 tokens by line+symbol (exact match, no ambiguity)
   const aOpenIdx = findTokenIdx(cloned, A.open.line, A.open.symbol);
   const aCloseIdx = findTokenIdx(cloned, A.close.line, A.close.symbol);
   const bOpenIdx = findTokenIdx(cloned, B.open.line, B.open.symbol);
@@ -194,7 +244,7 @@ function simulatePairSwap(
     return { valid: false };
   }
 
-  // Apply the swap:
+  // Apply the swap on the clone:
   // A.close → open (becomes B' open)
   cloned[aCloseIdx] = {
     ...cloned[aCloseIdx],
@@ -208,17 +258,22 @@ function simulatePairSwap(
     infostring: null,
     pairId: 0,
   };
-  // Reset pairIds for the other two (pairFences resets all anyway)
+  // Reset pairIds for the other two (pairFences will reassign)
   cloned[aOpenIdx].pairId = 0;
   cloned[bCloseIdx].pairId = 0;
 
-  // Run pairFences on the cloned tokens
+  // Run pairFences on the entire cloned document
   const paired = pairFences(cloned);
 
-  // Validity check 1: ALL tokens must be paired (pairId > 0)
+  // ── FULL-DOCUMENT VALIDATION ──
+  // Zero orphans allowed across the ENTIRE document, not just modified pairs.
   if (paired.some((t) => t.pairId === 0)) return { valid: false };
 
-  // Validity check 2: the resulting pairing structure must differ
+  // Cross-symbol boundary rule: no pair of one symbol type may span
+  // across the open→close range of a pair of a different symbol type.
+  if (hasCrossSymbolCrossing(paired)) return { valid: false };
+
+  // Resulting pairing structure must differ from current state (no-op filter)
   const currentStructure = getPairingStructure(tokens);
   const newStructure = getPairingStructure(paired);
   if (structuresEqual(currentStructure, newStructure)) return { valid: false };
@@ -258,13 +313,17 @@ function simulateSingleCloseChange(
     pairId: 0,
   };
 
-  // Run pairFences
+  // Run pairFences on the ENTIRE cloned document
   const paired = pairFences(cloned);
 
-  // Validity check 1: ALL tokens must be paired
+  // ── FULL-DOCUMENT VALIDATION ──
+  // Zero orphans allowed across the ENTIRE document.
   if (paired.some((t) => t.pairId === 0)) return { valid: false };
 
-  // Validity check 2: structure must differ
+  // Cross-symbol boundary rule
+  if (hasCrossSymbolCrossing(paired)) return { valid: false };
+
+  // Structure must differ (no-op filter)
   const currentStructure = getPairingStructure(tokens);
   const newStructure = getPairingStructure(paired);
   if (structuresEqual(currentStructure, newStructure)) return { valid: false };
@@ -277,88 +336,74 @@ function simulateSingleCloseChange(
 /**
  * Generate all valid actions from the current state.
  *
- * Restructure actions are validated by running pairFences on a clone:
- * 1. Pairwise close-swap: cross-pair two adjacent non-nested pairs into nesting
- * 2. Single close change: move one pair's close to an unpaired token
- *
- * An action is valid ONLY if:
- * - pairFences on the cloned tokens produces zero orphans
+ * Restructure actions are validated by running pairFences on a clone
+ * of the ENTIRE document. An action is valid ONLY if:
+ * - pairFences on the cloned tokens produces ZERO orphans
+ *   (every token has pairId > 0, not just the modified pairs)
  * - The resulting pairing structure differs from the current state
+ *
+ * Tilde-to-backtick conversion is always valid (when tilde exists)
+ * and includes atomic auto-adjustment of nesting counts.
  */
 export function generateValidActions(state: EditorState): Action[] {
   const actions: Action[] = [];
   const tokens = state.outputTokens;
   const pairs = getOutputPairs(tokens);
 
+  // After tilde conversion, suppress restructure actions for one frame.
+  // This prevents the UI from immediately suggesting merges of blocks that
+  // were previously separate symbol types (and were not intended to be merged).
+  const allowRestructure = !state.skipRestructure;
+
   // 1. Pairwise close-swap: for each pair of pairs (A, B) where A comes before B
-  for (let i = 0; i < pairs.length; i++) {
-    for (let j = i + 1; j < pairs.length; j++) {
-      const A = pairs[i];
-      const B = pairs[j];
+  if (allowRestructure) {
+    for (let i = 0; i < pairs.length; i++) {
+      for (let j = i + 1; j < pairs.length; j++) {
+        const A = pairs[i];
+        const B = pairs[j];
 
-      const result = simulatePairSwap(tokens, A, B);
-      if (!result.valid) continue;
+        const result = simulatePairSwap(tokens, A, B);
+        if (!result.valid) continue;
 
-      actions.push({
-        id: 0,
-        label:
-          `Change close fence for O.${A.id} from line ${A.close.line} to line ${B.close.line} (auto-pairs O.${B.id} to line ${B.open.line})`,
-        type: "restructure",
-        pairId: A.id,
-        newCloseLine: B.close.line,
-        swapPairId: B.id,
-      });
-    }
-  }
-
-  // 2. Single close change (fallback): move one pair's close to an unpaired token
-  const unpairedTokens = tokens.filter((t) => t.pairId === 0);
-  for (const pair of pairs) {
-    for (const candidate of unpairedTokens) {
-      if (candidate.symbol !== pair.open.symbol) continue;
-      if (candidate.line <= pair.open.line) continue;
-      if (candidate.line === pair.close.line) continue;
-
-      const result = simulateSingleCloseChange(tokens, pair, candidate);
-      if (!result.valid) continue;
-
-      actions.push({
-        id: 0,
-        label:
-          `Change close fence for O.${pair.id} from line ${pair.close.line} to line ${candidate.line}`,
-        type: "restructure",
-        pairId: pair.id,
-        newCloseLine: candidate.line,
-      });
-    }
-  }
-
-  // 3. Increase fence count actions: detect nesting violations per symbol type
-  for (const outer of pairs) {
-    for (const inner of pairs) {
-      if (inner.id === outer.id) continue;
-      if (inner.open.symbol !== outer.open.symbol) continue;
-      if (
-        inner.open.line > outer.open.line &&
-        inner.close.line < outer.close.line
-      ) {
-        if (outer.open.backtickCount <= inner.open.backtickCount) {
-          const symLabel = outer.open.symbol === "backtick"
-            ? "backtick"
-            : "tilde";
-          actions.push({
-            id: 0,
-            label:
-              `Increase ${symLabel} count for O.${outer.id} (need ${inner.open.backtickCount + 1}, have ${outer.open.backtickCount})`,
-            type: "increase-backtick",
-            pairId: outer.id,
-          });
-        }
+        actions.push({
+          id: 0,
+          label:
+            `Change close fence for O.${A.id} from line ${A.close.line} to line ${B.close.line} (auto-pairs O.${B.id} to line ${B.open.line})`,
+          type: "restructure",
+          pairId: A.id,
+          newCloseLine: B.close.line,
+          swapPairId: B.id,
+        });
       }
     }
   }
 
-  // 4. Convert tilde to backticks (if any tildes exist)
+  // 2. Single close change (fallback): move one pair's close to an unpaired token
+  if (allowRestructure) {
+    const unpairedTokens = tokens.filter((t) => t.pairId === 0);
+    for (const pair of pairs) {
+      for (const candidate of unpairedTokens) {
+        if (candidate.symbol !== pair.open.symbol) continue;
+        if (candidate.line <= pair.open.line) continue;
+        if (candidate.line === pair.close.line) continue;
+
+        const result = simulateSingleCloseChange(tokens, pair, candidate);
+        if (!result.valid) continue;
+
+        actions.push({
+          id: 0,
+          label:
+            `Change close fence for O.${pair.id} from line ${pair.close.line} to line ${candidate.line}`,
+          type: "restructure",
+          pairId: pair.id,
+          newCloseLine: candidate.line,
+        });
+      }
+    }
+  }
+
+  // 3. Convert tilde to backticks — ATOMIC: includes auto-adjustment
+  //    No standalone "increase count" action needed; auto-adjust runs after conversion.
   if (state.hasTilde) {
     actions.push({
       id: 0,
@@ -394,8 +439,6 @@ export function applyAction(
   switch (action.type) {
     case "restructure":
       return applyRestructure(state, action);
-    case "increase-backtick":
-      return applyIncreaseBacktick(state, action);
     case "convert-tilde":
       return applyConvertTilde(state);
   }
@@ -405,10 +448,10 @@ export function applyAction(
  * Apply a restructure action (swap or single-change).
  *
  * For swap actions: modifies both pairs' open/close tokens, runs pairFences,
- * auto-adjusts backticks, and regenerates raw strings.
+ * auto-adjusts counts, and regenerates raw strings.
  *
  * For single-change actions: promotes old close to open, sets new close,
- * runs pairFences, auto-adjusts backticks, and regenerates raw strings.
+ * runs pairFences, auto-adjusts counts, and regenerates raw strings.
  */
 function applyRestructure(state: EditorState, action: Action): EditorState {
   const { pairId, newCloseLine, swapPairId } = action;
@@ -419,6 +462,7 @@ function applyRestructure(state: EditorState, action: Action): EditorState {
   const A = pairs.find((p) => p.id === pairId);
   if (!A) return state;
 
+  // Deep clone — no reference leaks
   const cloned = cloneTokens(tokens);
 
   if (swapPairId !== undefined) {
@@ -469,66 +513,35 @@ function applyRestructure(state: EditorState, action: Action): EditorState {
     };
   }
 
-  // Re-pair all tokens (pure function)
+  // Re-pair ALL tokens in the document (pure function)
   const paired = pairFences(cloned);
 
-  // Auto-adjust backticks for nesting compliance
+  // Auto-adjust nesting counts (per symbol type)
   const adjusted = autoAdjustBackticks(paired);
 
   return {
     ...state,
     outputTokens: adjusted,
     actionLog: [...state.actionLog, action.label],
+    skipRestructure: false,
   };
 }
 
-function applyIncreaseBacktick(
-  state: EditorState,
-  action: Action,
-): EditorState {
-  const { pairId } = action;
-  if (pairId === undefined) return state;
-
-  const tokens = state.outputTokens;
-  const pairs = getOutputPairs(tokens);
-  const outer = pairs.find((p) => p.id === pairId);
-  if (!outer) return state;
-
-  // Find the maximum required fence count from nested inner fences (same symbol)
-  let required = outer.open.backtickCount;
-  for (const inner of pairs) {
-    if (inner.id === outer.id) continue;
-    if (inner.open.symbol !== outer.open.symbol) continue;
-    if (
-      inner.open.line > outer.open.line &&
-      inner.close.line < outer.close.line
-    ) {
-      const min = inner.open.backtickCount + 1;
-      if (min > required) required = min;
-    }
-  }
-
-  // Update all tokens in the outer pair, regenerating raw strings
-  const newTokens = tokens.map((t) => {
-    if (t.pairId === pairId) {
-      const updated = { ...t, backtickCount: required };
-      return { ...updated, raw: rebuildRaw(updated) };
-    }
-    return { ...t };
-  });
-
-  return {
-    ...state,
-    outputTokens: newTokens,
-    actionLog: [
-      ...state.actionLog,
-      `Increased backtick count for O.${pairId} to ${required}`,
-    ],
-  };
-}
-
+/**
+ * Atomic tilde-to-backtick conversion with auto-adjustment.
+ *
+ * 1. Change symbol: tilde → backtick for all matching tokens.
+ * 2. Regenerate raw strings.
+ * 3. Run autoAdjustBackticks to enforce outer >= inner + 1 for all
+ *    nested backtick pairs (including newly converted ones).
+ * 4. Regenerate raw strings again after count adjustments.
+ *
+ * This makes the conversion atomic — the resulting state always has
+ * valid nesting counts. No separate "increase count" step is needed.
+ */
 function applyConvertTilde(state: EditorState): EditorState {
-  const newTokens = state.outputTokens.map((t) => {
+  // Step 1: Convert symbols, regenerate raw
+  const converted = state.outputTokens.map((t) => {
     if (t.symbol === "tilde") {
       const updated = { ...t, symbol: "backtick" as const };
       return { ...updated, raw: rebuildRaw(updated) };
@@ -536,10 +549,15 @@ function applyConvertTilde(state: EditorState): EditorState {
     return { ...t };
   });
 
+  // Step 2: Auto-adjust nesting counts for all backtick pairs
+  //         (now includes newly converted fences)
+  const adjusted = autoAdjustBackticks(converted);
+
   return {
     ...state,
-    outputTokens: newTokens,
+    outputTokens: adjusted,
     hasTilde: false,
+    skipRestructure: true,
     actionLog: [...state.actionLog, "Converted all tilde fences to backticks"],
   };
 }
@@ -628,7 +646,7 @@ export function getOutputPairs(tokens: FenceToken[]): FencePairInfo[] {
   return pairs;
 }
 
-// ─── Auto-Adjust Backticks ──────────────────────────────────────
+// ─── Auto-Adjust Nesting Counts ─────────────────────────────────
 
 /**
  * Auto-adjust fence counts to satisfy the nesting rule:
@@ -637,7 +655,7 @@ export function getOutputPairs(tokens: FenceToken[]): FencePairInfo[] {
  * Applies per symbol type: only adjusts when both outer and inner use
  * the same symbol (backtick-backtick or tilde-tilde). Does not mix symbols.
  *
- * Regenerates raw strings for ALL tokens after adjustment.
+ * Increments counts minimally, then regenerates raw strings for ALL tokens.
  */
 export function autoAdjustBackticks(tokens: FenceToken[]): FenceToken[] {
   const result = tokens.map((t) => ({ ...t }));
@@ -666,7 +684,7 @@ export function autoAdjustBackticks(tokens: FenceToken[]): FenceToken[] {
     }
   }
 
-  // Regenerate raw strings
+  // Regenerate raw strings for ALL tokens after count adjustments
   for (let i = 0; i < result.length; i++) {
     result[i] = {
       ...result[i],
