@@ -24,9 +24,9 @@ Strict TypeScript。`any` 型の使用は禁止。すべての変数・引数・
 
 ```
 src/
-├── cli.ts          # エントリポイント・フロー制御
-├── args.ts         # CLIオプション定義と自前パーサー
-├── runtime.ts      # Deno固有APIの薄いラッパー
+├── cli.ts          # エントリポイント・フロー制御・ストリーム分離
+├── args.ts         # CLIオプション定義、自前パーサー、フォーマット自動検出
+├── runtime.ts      # Deno固有APIの薄いラッパー（stdin/TTY分離）
 ├── model/
 │   ├── fence.ts    # FenceToken, FencePair などの型・純粋なデータ定義
 │   └── state.ts    # EditorState, pairFences, generateValidActions, applyAction
@@ -34,7 +34,7 @@ src/
 │   ├── commonmark.ts   # micromarkを使ったパーサー
 │   └── djot.ts         # djot.jsを使ったパーサー
 └── ui/
-    ├── render.ts   # Statusテーブルと ActionsのANSI描画
+    ├── render.ts   # Statusテーブルと ActionsのANSI描画（stderr専用）
     └── loop.ts     # 入力ループ・シグナルハンドリング
 ```
 
@@ -52,6 +52,13 @@ model/state.ts ─→ model/fence.ts
 
 **原則:** 純粋ロジックは `model/` と `parser/` に隔離。副作用（I/O、画面描画、プロセス制御）は `cli.ts`, `ui/loop.ts`, `runtime.ts` のみ。
 
+### ユーティリティモジュール
+
+`args.ts` に以下の純粋ユーティリティ関数を定義:
+
+- **`resolveFormat(inputPath, explicitFormat)`**: 拡張子ベースのパーサー自動検出。明示的フラグ > 拡張子 > commonmarkフォールバックの優先順位。
+- **`generateDefaultOutputPath(inputPath, format)`**: フォーマットに対応したデフォルト出力ファイル名生成。
+
 ---
 
 ## 3. データモデル
@@ -64,7 +71,7 @@ model/state.ts ─→ model/fence.ts
 interface FenceToken {
   line: number           // 行番号（1始まり）
   raw: string            // 元の行テキスト（80文字でtruncate済み）
-  backtickCount: number  // バッククォートまたはチルダの個数
+  backtickCount: number  // バッククォートまたはチルダの個数（汎用のフェンス長フィールド）
   symbol: "backtick" | "tilde"
   infostring: string | null
   kind: "open" | "close"
@@ -88,6 +95,7 @@ interface EditorState {
   outputTokens: FenceToken[]              // 操作によって変化する可変コピー
   hasTilde: boolean                       // チルダフェンスが存在するか
   actionLog: string[]                     // 適用済み操作のログ
+  format: "commonmark" | "djot"           // 解決済みパーサー形式
 }
 ```
 
@@ -104,6 +112,14 @@ CommonMarkとDjotでパーサーを切り替えられるよう、どちらも同
 ```ts
 type FenceParser = (source: string) => FenceToken[]
 ```
+
+### フォーマット解決パイプライン
+
+1. `--format` フラグが指定されていれば、その値をそのまま使用する。
+2. 入力ファイルの拡張子から自動検出（`.md`/`.markdown`/`.mdx` → `commonmark`、`.dj`/`.djt` → `djot`）。
+3. 不明な拡張子、拡張子なし、または stdin → `commonmark` にフォールバック。
+
+この解決結果は `createEditorState(tokens, resolvedFormat)` に渡され、UIの `Parsed as <FORMAT>` 表示と出力ファイル名生成の両方で使用される。
 
 ### CommonMark（micromark）
 
@@ -139,9 +155,20 @@ type FenceParser = (source: string) => FenceToken[]
 
 ### 描画方針
 
-TUIフレームワークは使用しない。ANSIエスケープシーケンスを直接 `Deno.stdout.writeSync()` で出力して画面を再描画する。`console.clear()` は使用しない（`\x1b[H\x1b[2J` で画面クリア）。
+TUIフレームワークは使用しない。ANSIエスケープシーケンスを直接 `Deno.stderr.writeSync()` で出力して画面を再描画する。`console.clear()` は使用しない（`\x1b[H\x1b[2J` で画面クリア）。
+
+**重要: 全UI出力は stderr に送信する。** `Deno.stdout` はドキュメントデータ出力のみに予約される。
 
 操作のたびに画面全体を再描画する。テーブルは `state.outputTokens` から直接読み取る — 独立したUI状態配列は存在しない。
+
+### stderr / stdout 分離
+
+| ストリーム | 用途 | 具体例 |
+|---|---|---|
+| **stderr** | すべての対話UI | Terms、Statusテーブル、Actions、プロンプト、エラー、Goodbye |
+| **stdout** | 再構築ドキュメントのみ | `[3] Print to stdout` 選択時のファイル内容 |
+
+この分離により、`fence-editor input.md | grep "code"` のようなパイプラインで、UIはターミナルに表示され、ドキュメントデータのみがパイプを流れる。
 
 ### Statusテーブルのレンダリング
 
@@ -190,11 +217,15 @@ Deno.addSignalListener("SIGINT", () => {
 
 ### フッター行
 
-Actionsリストの直下に以下のヒント行を毎回の再描画で表示:
+Actionsリストの直下に以下のヒント行を毎回の再描画で必ず表示する:
 
 ```
   > Enter action # | 0 or q to exit & save | Ctrl+C to cancel
 ```
+
+### Actions ヘッダー
+
+簡潔な `Actions:` のみを表示。`"enter number to apply"` 等の冗長な説含は含めない（フッター行がその役割を果たす）。
 
 ### Actions の生成
 
@@ -202,7 +233,7 @@ Actionsリストの直下に以下のヒント行を毎回の再描画で表示:
 
 1. ペアワイズクローズスワップ（主要）
 2. シングルクローズチェンジ（未ペアトークン向けフォールバック）
-3. バッククォート数の増加が必要なペア（ネスト違反時）
+3. フェンス数の増加が必要なペア（ネスト違反時、シンボル種別対応）
 4. `hasTilde === true` の場合のみ: チルダ→バッククォート変換
 
 ---
@@ -227,6 +258,7 @@ Actionsリストの直下に以下のヒント行を毎回の再描画で表示:
 - `A.close` を `kind: "open"` に昇格。
 - `B.open` を `kind: "close"` に設定。
 - `pairFences()` 実行後、`A' = (A.open, B.close)`, `B' = (A.close, B.open)` の構造を検証。
+- 同一シンボル種間でのみスワップを提案。
 
 ### `applyAction(state: EditorState, actionIndex: number): EditorState`
 
@@ -242,7 +274,8 @@ Actionsリストの直下に以下のヒント行を毎回の再描画で表示:
 
 トークンのプロパティから `raw` 文字列を再生成:
 
-- `symbol` に応じて `` ` `` または `~` を `backtickCount` 回繰り返す。
+- `symbol === "backtick"` → `` ` `` を `backtickCount` 回繰り返す。
+- `symbol === "tilde"` → `~` を `backtickCount` 回繰り返す。
 - `kind === "open"` かつ `infostring !== null` の場合、フェンス文字の直後に infostring を連結。
 - 閉じフェンスの場合はフェンス文字列のみ。
 
@@ -252,13 +285,15 @@ Actionsリストの直下に以下のヒント行を毎回の再描画で表示:
 
 ```
 if (inner.open.line > outer.open.line && inner.close.line < outer.close.line) {
-  if (outer.backtickCount <= inner.backtickCount) {
-    outer.backtickCount = inner.backtickCount + 1  // 最小増分のみ
+  if (inner.open.symbol === outer.open.symbol) {  // 同一シンボル種のみ
+    if (outer.backtickCount < inner.backtickCount + 1) {
+      outer.backtickCount = inner.backtickCount + 1  // 最小増分のみ
+    }
   }
 }
 ```
 
-両方とも `symbol: "backtick"` の場合のみ調整。調整後、全トークンの `raw` を再生成。
+backtick↔backtick、tilde↔tilde のみで調整。シンボル種を跨ぐ調整は行わない。調整後、全トークンの `raw` を `rebuildRaw()` で再生成。
 
 ### `reconstructOutput(outputTokens: FenceToken[], originalLines: string[]): string`
 
@@ -282,7 +317,22 @@ export function writeFile(path: string, content: string): Promise<void>
 export function exit(code: number): never
 ```
 
-`readLine()` は1バイトずつ読み取り `\n` で区切る。末尾の `\r` は除去する。
+### stdin / TTY 分離
+
+`readStdin()` と `readLine()` は異なるストリームから読み取る:
+
+- **`readStdin()`**: `Deno.stdin` から全データを読み込む。パイプ入力に対応。
+- **`readLine()`**: インタラクティブプロンプト用。**常に制御端末から読み取る。**
+
+`readLine()` の実装:
+
+1. `Deno.stdin.isTerminal()` をチェック。
+2. `false` の場合（パイプ入力）、`/dev/tty`（Unix）または `CON`（Windows）を開いて対話入力を読み取る。
+3. いずれも失敗した場合はフォールバックとして `Deno.stdin` を使用する。
+4. 端末ハンドルをキャッシュし、呼び出しごとに再オープンしない（リソースリーク防止）。
+5. 1バイトずつ読み取り `\n` で区切る。末尾の `\r` は除去する。
+
+これにより、`cat file.md | fence-editor` のようなパイプラインでもUIは正しく端末で待機し、無限ループやフリッカーを回避する。
 
 ---
 
@@ -316,11 +366,11 @@ export function exit(code: number): never
 ### パーミッション
 
 ```sh
-deno run --allow-read jsr:@yourname/fence-editor input.md                    # stdoutのみ
-deno run --allow-read --allow-write jsr:@yourname/fence-editor input.md      # 保存/上書きあり
+deno run --allow-read jsr:@yourname/fence-editor input.md                    # stdoutのみ（[3]）
+deno run --allow-read --allow-write jsr:@yourname/fence-editor input.md      # 保存/上書きあり（[1]/[2]）
 ```
 
-stdoutのみの場合（`[3] Print to stdout`）、`--allow-write` は不要。
+stdoutのみの場合（`[3] Print to stdout`）、`--allow-write` は不要。パイプライン統合時は `--allow-read` のみで動作する。
 
 ---
 
@@ -333,8 +383,12 @@ stdoutのみの場合（`[3] Print to stdout`）、`--allow-write` は不要。
 | 高 | ペアワイズクローズスワップ + シミュレーション検証 | 完了 |
 | 高 | `applyAction` による状態ミューテーション + raw再生成 | 完了 |
 | 高 | `reconstructOutput` による出力ファイル再構築 | 完了 |
+| 高 | stderr/stdout ストリーム分離（UI vs データ） | 完了 |
+| 高 | stdin/TTY 分離（パイプ入力対応） | 完了 |
 | 中 | Djotパーサー（djot.js）、フォーマット切り替え | 完了 |
 | 中 | チルダ→バッククォート変換Action | 完了 |
-| 中 | バッククォート数自動調整（ネストルール準拠） | 完了 |
+| 中 | フェンス数自動調整（ネストルール準拠、シンボル種別対応） | 完了 |
 | 中 | ヘルプドキュメント強化、空入力・Ctrl+C対応 | 完了 |
+| 中 | フォーマット自動検出 + フォーマット対応デフォルト出力ファイル名 | 完了 |
+| 中 | UI改善: `Actions:` ヘッダー簡素化、`Parsed as` 表示、フッター行 | 完了 |
 | 低 | Statusログのファイル保存 | 未実装 |
