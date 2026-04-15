@@ -39,7 +39,7 @@ Auto-Detection:
 
 Interactive Mode:
   Enter a number from Actions to apply changes to the fence structure.
-  Press 0 or q to exit, choose an output destination, and save changes.
+  Press 0 to exit, choose an output destination, and save changes.
   Press Ctrl+C to abort immediately without saving any changes.
   Output destinations: [1] Save as new file, [2] Overwrite input, [3] Print to stdout
 

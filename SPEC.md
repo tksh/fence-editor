@@ -63,7 +63,7 @@ Auto-Detection:
 
 Interactive Mode:
   Enter a number from Actions to apply changes to the fence structure.
-  Press 0 or q to exit, choose an output destination, and save changes.
+  Press 0 to exit, choose an output destination, and save changes.
   Press Ctrl+C to abort immediately without saving any changes.
   Output destinations: [1] Save as new file, [2] Overwrite input, [3] Print to stdout
 
@@ -101,7 +101,7 @@ fence-editor input.md | pandoc -f markdown # stdoutを別ツールに渡す
 
 ### 出力先の選択
 
-対話UIで `0` または `q` を入力すると終了フローに入り、以下の出力先選択プロンプトが stderr に表示される:
+対話UIで `0` を入力すると終了フローに入り、以下の出力先選択プロンプトが stderr に表示される:
 
 ```
 Choose output destination:
@@ -110,12 +110,15 @@ Choose output destination:
   [2] Overwrite input file
   [3] Print to stdout
 
+  > Enter action # | 0 to return to editor | Ctrl+C to cancel
+
 > _
 ```
 
 - `[1] Save as new file`: 新規ファイルパスの入力を求める。デフォルトは `${base}_edited.<ext>`（拡張子は解決済みパーサーに対応）。stdin入力のデフォルトは `edited_output.<ext>`。ユーザーは任意のパスを入力可能。
 - `[2] Overwrite input file`: 入力ファイルを上書き。stdinからの入力だった場合はエラーで終了。
 - `[3] Print to stdout`: 再構築後のドキュメントを stdout にのみ出力。UIテキストは一切含まない。
+- `[0] Cancel`: 保存せずにエディターに戻る。対話ループが再開され、さらにアクションを適用できる。
 
 ### デフォルトファイル名生成ルール
 
@@ -161,7 +164,7 @@ Actions:
 
   [1] Change close fence for O.1 from line 8 to line 14 (auto-pairs O.2 to line 11)
 
-  > Enter action # | 0 or q to exit & save | Ctrl+C to cancel
+  > Enter action # | 0 to exit & save | Ctrl+C to cancel
 
 > _
 ```
@@ -190,7 +193,7 @@ Actions:
 - 連番入力方式: `Actions` に表示された番号を入力しEnterで確定。
 - 操作を適用するたびに `Status` テーブルと `Actions` が全再描画される。
 - **空行・空白のみの入力・非数値の入力** はエラーメッセージを出さず、静かに再プロンプトする。
-- `0` または `q` + Enter で終了フローへ移行（出力先選択）。
+- `0` + Enter で終了フローへ移行（出力先選択）。
 - `Ctrl+C` は即座に終了コード0でabort。ファイルへの変更は一切保存されない。未処理の例外は発生しない。
 
 ### 4.4 必須フッター行
@@ -198,7 +201,7 @@ Actions:
 Actionsリストの直下に以下のヒント行を毎回の再描画で必ず表示する:
 
 ```
-  > Enter action # | 0 or q to exit & save | Ctrl+C to cancel
+  > Enter action # | 0 to exit & save | Ctrl+C to cancel
 ```
 
 ### 4.5 Actionsの内容
