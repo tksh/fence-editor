@@ -12,16 +12,16 @@
  * | line | input                | I. | O. | output               |
  * |-----:|:---------------------|---:|---:|:---------------------|
  *
- * Column widths:
- *   line:   6 chars (right-aligned)
- *   input:  22 chars (left-aligned, truncated)
- *   I.:     4 chars (right-aligned)
- *   O.:     4 chars (right-aligned)
- *   output: 22 chars (left-aligned, truncated)
+ * Column content widths (spaces around pipes added by formatRow):
+ *   line:   4 chars (right-aligned)
+ *   input:  20 chars (left-aligned, truncated)
+ *   I.:     2 chars (right-aligned)
+ *   O.:     2 chars (right-aligned)
+ *   output: 20 chars (left-aligned, truncated)
  *
- * Total content: 6 + 22 + 4 + 4 + 22 = 58
- * Pipes + spaces: 5 pipes + 8 spaces = 13
- * Total: 58 + 13 = 71 (within 80-char limit)
+ * Content total: 4 + 20 + 2 + 2 + 20 = 48
+ * Pipes + spaces: 5 pipes + 10 spaces = 15
+ * Total: 48 + 15 = 63 (within 80-char limit)
  *
  * The output column renders state.outputTokens[i].raw directly.
  * The O. column renders state.outputTokens[i].pairId directly.
@@ -37,10 +37,10 @@ import {
 import type { FenceToken } from "../model/fence.ts";
 import { truncate } from "../model/fence.ts";
 
-const COL_LINE_W = 6;
-const COL_INPUT_W = 22;
-const COL_ID_W = 4;
-const COL_OUTPUT_W = 22;
+const COL_LINE_W = 4;
+const COL_INPUT_W = 20;
+const COL_ID_W = 2;
+const COL_OUTPUT_W = 20;
 
 /** ANSI codes */
 const CLEAR_SCREEN = "\x1b[H\x1b[2J";
@@ -191,7 +191,9 @@ function buildTokenMap(tokens: ReadonlyArray<FenceToken>): Map<number, FenceToke
 }
 
 /**
- * Format a table row with proper column widths and alignment.
+ * Format a table row in Markdown table format.
+ * Exactly one space between each pipe and content.
+ * Right-aligned: line, I., O.  Left-aligned: input, output.
  */
 function formatRow(
   line: string,
@@ -206,18 +208,21 @@ function formatRow(
   const col4 = padLeft(outputId, COL_ID_W);
   const col5 = padRight(truncate(output, COL_OUTPUT_W), COL_OUTPUT_W);
 
-  return `|${col1}|${col2}|${col3}|${col4}|${col5}|`;
+  return `| ${col1} | ${col2} | ${col3} | ${col4} | ${col5} |`;
 }
 
 /**
- * Format the table separator row.
+ * Format the Markdown table separator row with alignment colons.
+ * Each cell width is COL_W + 2 to match the padded width in formatRow
+ * (`| ${content} |` → content is COL_W chars, surrounding spaces add 2).
+ * |-----:|:---------------------|---:|---:|:---------------------|
  */
 function formatSeparator(): string {
-  const col1 = "-".repeat(COL_LINE_W);
-  const col2 = "-".repeat(COL_INPUT_W);
-  const col3 = "-".repeat(COL_ID_W);
-  const col4 = "-".repeat(COL_ID_W);
-  const col5 = "-".repeat(COL_OUTPUT_W);
+  const col1 = "-".repeat(COL_LINE_W + 1) + ":";
+  const col2 = ":" + "-".repeat(COL_INPUT_W + 1);
+  const col3 = "-".repeat(COL_ID_W + 1) + ":";
+  const col4 = "-".repeat(COL_ID_W + 1) + ":";
+  const col5 = ":" + "-".repeat(COL_OUTPUT_W + 1);
 
   return `|${col1}|${col2}|${col3}|${col4}|${col5}|`;
 }
