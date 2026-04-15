@@ -271,7 +271,7 @@ export function renderActions(actions: Action[]): void {
 
   // Persistent hint footer (within 80 chars)
   Deno.stderr.writeSync(
-    out(`\n  ${DIM}> Enter action # | 0 or q to exit & save | Ctrl+C to cancel${RESET}\n`),
+    out(`\n  ${DIM}> Enter action # | 0 to exit & save | Ctrl+C to cancel${RESET}\n`),
   );
 }
 
@@ -287,6 +287,9 @@ export function renderPrompt(): void {
 /**
  * Render the output destination selector.
  * Written to stderr.
+ *
+ * The footer hint doubles as the "cancel" option indicator — no separate [0]
+ * option line is shown.
  */
 export function renderOutputSelector(): void {
   Deno.stderr.writeSync(out("\n"));
@@ -295,6 +298,10 @@ export function renderOutputSelector(): void {
   Deno.stderr.writeSync(out("  [1] Save as new file\n"));
   Deno.stderr.writeSync(out("  [2] Overwrite input file\n"));
   Deno.stderr.writeSync(out("  [3] Print to stdout\n"));
+  Deno.stderr.writeSync(out("\n"));
+  Deno.stderr.writeSync(
+    out(`  ${DIM}> Enter action # | 0 to return to editor | Ctrl+C to cancel${RESET}\n`),
+  );
   Deno.stderr.writeSync(out("\n"));
   Deno.stderr.writeSync(out(`${CYAN}>${RESET} `));
 }

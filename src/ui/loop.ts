@@ -21,7 +21,7 @@ import {
 import { readLine } from "../runtime.ts";
 
 /** Output destination choice. */
-export type OutputDestination = "save-new" | "overwrite" | "stdout";
+export type OutputDestination = "save-new" | "overwrite" | "stdout" | "cancel";
 
 /**
  * Run the interactive editing loop.
@@ -52,8 +52,8 @@ export async function runInteractiveLoop(
     const input = await readLine();
     const trimmed = input.trim().toLowerCase();
 
-    // Exit on '0' or 'q'
-    if (trimmed === "0" || trimmed === "q") {
+    // Exit on '0'
+    if (trimmed === "0") {
       break;
     }
 
@@ -85,11 +85,15 @@ export async function runInteractiveLoop(
     const input = await readLine();
     const trimmed = input.trim();
 
+    // Empty input: silently re-prompt
+    if (trimmed.length === 0) continue;
+
     if (trimmed === "1") return { state, destination: "save-new" };
     if (trimmed === "2") return { state, destination: "overwrite" };
     if (trimmed === "3") return { state, destination: "stdout" };
+    if (trimmed === "0") return { state, destination: "cancel" };
 
-    renderError("Invalid choice. Enter 1, 2, or 3.");
+    renderError("Invalid choice. Enter 1, 2, 3, or 0 to cancel.");
   }
 }
 

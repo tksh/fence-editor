@@ -96,14 +96,20 @@ async function main(): Promise<void> {
     exit(1);
   }
 
-  const state = createEditorState(tokens, resolvedFormat);
+  let state = createEditorState(tokens, resolvedFormat);
 
-  // 5. Run interactive loop — returns the modified state and destination
-  const { state: finalState, destination } = await runInteractiveLoop(state);
+  // 5. Run interactive loop — may return "cancel" to continue editing
+  let destination: OutputDestination;
+  while (true) {
+    const result = await runInteractiveLoop(state);
+    state = result.state;
+    destination = result.destination;
+    if (destination !== "cancel") break;
+  }
 
   // 6. Reconstruct output: iterate originalLines, replace fence lines with
   //    the updated token.raw from finalState.outputTokens
-  const output = reconstructOutput(finalState.outputTokens, originalLines);
+  const output = reconstructOutput(state.outputTokens, originalLines);
 
   // 7. Handle output destination
   await handleOutput(destination, output, inputFile, resolvedFormat);
