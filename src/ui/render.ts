@@ -300,6 +300,7 @@ export function renderOutputSelector(): void {
   Deno.stderr.writeSync(out("  [3] Print to stdout\n"));
   Deno.stderr.writeSync(out("\n"));
   Deno.stderr.writeSync(out("Also save a summary of fence edits:\n"));
+  Deno.stderr.writeSync(out("\n"));
   Deno.stderr.writeSync(out("  [4] Save status table as Markdown file\n"));
   Deno.stderr.writeSync(out("\n"));
   Deno.stderr.writeSync(

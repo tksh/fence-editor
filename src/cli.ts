@@ -239,12 +239,8 @@ function generateExportContent(
     lines.push("");
   }
 
-  // Remove trailing empty line
-  if (lines[lines.length - 1] === "") {
-    lines.pop();
-  }
-
-  return lines.join("\n");
+  // Ensure trailing newline
+  return lines.join("\n") + "\n";
 }
 
 main();
