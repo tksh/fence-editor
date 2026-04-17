@@ -21,7 +21,7 @@ import {
 import { readLine } from "../runtime.ts";
 
 /** Output destination choice. */
-export type OutputDestination = "save-new" | "overwrite" | "stdout" | "cancel";
+export type OutputDestination = "save-new" | "overwrite" | "stdout" | "save-status" | "cancel";
 
 /**
  * Run the interactive editing loop.
@@ -91,9 +91,10 @@ export async function runInteractiveLoop(
     if (trimmed === "1") return { state, destination: "save-new" };
     if (trimmed === "2") return { state, destination: "overwrite" };
     if (trimmed === "3") return { state, destination: "stdout" };
+    if (trimmed === "4") return { state, destination: "save-status" };
     if (trimmed === "0") return { state, destination: "cancel" };
 
-    renderError("Invalid choice. Enter 1, 2, 3, or 0 to cancel.");
+    renderError("Invalid choice. Enter 1, 2, 3, 4, or 0 to cancel.");
   }
 }
 

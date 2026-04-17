@@ -18,6 +18,8 @@ export interface EditorState {
   outputTokens: FenceToken[];
   hasTilde: boolean;
   actionLog: string[];
+  /** Status history capturing table after each action */
+  statusHistory: Array<{ actionLabel: string; table: string }>;
   /** Parser format used: "commonmark" or "djot" */
   format: "commonmark" | "djot";
   /** Suppress restructure actions for one frame after tilde conversion */
@@ -31,7 +33,8 @@ export function createEditorState(
   const inputTokens = Object.freeze(tokens.map((t) => ({ ...t })));
   const outputTokens = tokens.map((t) => ({ ...t }));
   const hasTilde = tokens.some((t) => t.symbol === "tilde");
-  return { inputTokens, outputTokens, hasTilde, actionLog: [], format, skipRestructure: false };
+  const statusHistory = [{ actionLabel: "Initial", table: renderStatusTableAsMarkdown(tokens) }];
+  return { inputTokens, outputTokens, hasTilde, actionLog: [], statusHistory, format, skipRestructure: false };
 }
 
 // ─── Pure Pairing Function ──────────────────────────────────────
@@ -436,12 +439,26 @@ export function applyAction(
   const action = actions.find((a) => a.id === actionIndex);
   if (!action) return state;
 
+  let newState: EditorState;
   switch (action.type) {
     case "restructure":
-      return applyRestructure(state, action);
+      newState = applyRestructure(state, action);
+      break;
     case "convert-tilde":
-      return applyConvertTilde(state);
+      newState = applyConvertTilde(state);
+      break;
+    default:
+      return state;
   }
+
+  // Capture status table after applying the action
+  const table = renderStatusTableAsMarkdown(newState.outputTokens);
+  newState.statusHistory = [
+    ...state.statusHistory,
+    { actionLabel: action.label, table },
+  ];
+
+  return newState;
 }
 
 /**
@@ -693,4 +710,39 @@ export function autoAdjustBackticks(tokens: FenceToken[]): FenceToken[] {
   }
 
   return result;
+}
+
+/**
+ * Render the status table as a Markdown string for export.
+ * This includes the initial table and each action's resulting table.
+ * Backtick characters in table cells are escaped as HTML entities.
+ */
+function renderStatusTableAsMarkdown(tokens: FenceToken[]): string {
+  const escaped = (s: string) => s.replace(/`/g, '&#96;');
+  const lines: string[] = [];
+
+  lines.push('| line | input                | I. | O. | output               |');
+  lines.push('|-----:|:---------------------|---:|---:|:---------------------|');
+
+  const tokenMap = new Map<number, FenceToken>();
+  for (const t of tokens) {
+    tokenMap.set(t.line, t);
+  }
+
+  const allLines = [...new Set(tokens.map((t) => t.line))].sort((a, b) => a - b);
+
+  for (const lineNum of allLines) {
+    const token = tokenMap.get(lineNum);
+    const lineStr = String(lineNum);
+    const inputRaw = token ? escaped(token.raw) : '';
+    const inputId = token && token.pairId > 0 ? String(token.pairId) : '';
+    const outputId = token && token.pairId > 0 ? String(token.pairId) : '';
+    const outputRaw = token ? escaped(token.raw) : '';
+
+    lines.push(
+      `| ${lineStr.padStart(4)} | ${inputRaw.padEnd(20)} | ${inputId.padStart(2)} | ${outputId.padStart(2)} | ${outputRaw.padEnd(20)} |`,
+    );
+  }
+
+  return lines.join('\n');
 }

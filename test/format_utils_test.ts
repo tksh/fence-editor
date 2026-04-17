@@ -51,19 +51,19 @@ Deno.test("resolveFormat: stdin (null) falls back to commonmark", () => {
 
 // ─── generateDefaultOutputPath ───────────────────────────────────
 
-Deno.test("generateDefaultOutputPath: .md input → _edited.md", () => {
-  assertEquals(generateDefaultOutputPath("doc.md", "commonmark"), "doc_edited.md");
+Deno.test("generateDefaultOutputPath: .md input → .edits.md", () => {
+  assertEquals(generateDefaultOutputPath("doc.md", "commonmark"), "doc.edits.md");
   assertEquals(
     generateDefaultOutputPath("src/guide.md", "commonmark"),
-    "src/guide_edited.md",
+    "src/guide.edits.md",
   );
 });
 
-Deno.test("generateDefaultOutputPath: .dj input → _edited.dj", () => {
-  assertEquals(generateDefaultOutputPath("notes.dj", "djot"), "notes_edited.dj");
+Deno.test("generateDefaultOutputPath: .dj input → .edits.dj", () => {
+  assertEquals(generateDefaultOutputPath("notes.dj", "djot"), "notes.edits.dj");
   assertEquals(
     generateDefaultOutputPath("test/00.dj", "djot"),
-    "test/00_edited.dj",
+    "test/00.edits.dj",
   );
 });
 
@@ -75,24 +75,24 @@ Deno.test("generateDefaultOutputPath: stdin → edited_output.<ext>", () => {
 Deno.test("generateDefaultOutputPath: format-aware even with .md input overridden to djot", () => {
   assertEquals(
     generateDefaultOutputPath("doc.md", "djot"),
-    "doc_edited.dj",
+    "doc.edits.dj",
   );
 });
 
 Deno.test("generateDefaultOutputPath: handles complex paths", () => {
   assertEquals(
     generateDefaultOutputPath("/home/user/docs/readme.md", "commonmark"),
-    "/home/user/docs/readme_edited.md",
+    "/home/user/docs/readme.edits.md",
   );
   assertEquals(
     generateDefaultOutputPath("relative/path/to/file.dj", "djot"),
-    "relative/path/to/file_edited.dj",
+    "relative/path/to/file.edits.dj",
   );
 });
 
 Deno.test("generateDefaultOutputPath: file with no extension", () => {
-  assertEquals(generateDefaultOutputPath("Makefile", "commonmark"), "Makefile_edited.md");
-  assertEquals(generateDefaultOutputPath("Makefile", "djot"), "Makefile_edited.dj");
+  assertEquals(generateDefaultOutputPath("Makefile", "commonmark"), "Makefile.edits.md");
+  assertEquals(generateDefaultOutputPath("Makefile", "djot"), "Makefile.edits.dj");
 });
 
 // ─── parseArgs compatibility ────────────────────────────────────

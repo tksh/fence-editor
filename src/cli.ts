@@ -26,7 +26,7 @@ import { getArgs, readStdin, readLine, exit, writeFile } from "./runtime.ts";
 import { parseCommonMark } from "./parser/commonmark.ts";
 import { parseDjot } from "./parser/djot.ts";
 import type { FenceParser } from "./model/fence.ts";
-import { createEditorState, reconstructOutput } from "./model/state.ts";
+import { createEditorState, reconstructOutput, type EditorState } from "./model/state.ts";
 import {
   runInteractiveLoop,
   type OutputDestination,
@@ -112,7 +112,7 @@ async function main(): Promise<void> {
   const output = reconstructOutput(state.outputTokens, originalLines);
 
   // 7. Handle output destination
-  await handleOutput(destination, output, inputFile, resolvedFormat);
+  await handleOutput(destination, output, inputFile, resolvedFormat, state, originalLines);
 
   exit(0);
 }
@@ -128,6 +128,8 @@ async function handleOutput(
   output: string,
   inputFile: string | null,
   format: "commonmark" | "djot",
+  state: EditorState,
+  originalLines: string[],
 ): Promise<void> {
   switch (destination) {
     case "stdout": {
@@ -169,7 +171,80 @@ async function handleOutput(
       );
       break;
     }
+    case "save-status": {
+      clearScreen();
+      renderGoodbye();
+      // Format-aware default output path with .edits extension
+      const defaultName = generateDefaultOutputPath(inputFile, format);
+      Deno.stderr.writeSync(
+        new TextEncoder().encode(`Enter file path [${defaultName}]: `),
+      );
+      const pathInput = await readLine();
+      const filePath = pathInput.trim() || defaultName;
+      // Generate export content
+      const exportContent = generateExportContent(
+        state.statusHistory,
+        state.outputTokens,
+        originalLines,
+      );
+      await writeFile(filePath, exportContent);
+      Deno.stderr.writeSync(
+        new TextEncoder().encode(`Saved status table to ${filePath}\n`),
+      );
+      break;
+    }
   }
+}
+
+function generateExportContent(
+  statusHistory: Array<{ actionLabel: string; table: string }>,
+  outputTokens: any[],
+  originalLines: string[],
+): string {
+  const lines: string[] = [];
+
+  lines.push("# Summary of Fence Edits");
+  lines.push("");
+
+  // Applied Actions section
+  lines.push("## Applied Actions");
+  lines.push("");
+  for (const [idx, entry] of statusHistory.entries()) {
+    if (idx === 0) continue; // Skip initial entry
+    const actionNum = idx; // 1-based
+    lines.push(`${actionNum}. ${entry.actionLabel}`);
+  }
+  lines.push("");
+
+  // Status Changes section
+  lines.push("## Status Changes");
+  lines.push("");
+
+  // Initial state
+  lines.push("Initial:");
+  lines.push("");
+  lines.push(statusHistory[0].table);
+  lines.push("");
+
+  // Each action's resulting state as "Done: N. ..."
+  for (const [idx, entry] of statusHistory.entries()) {
+    if (idx === 0) continue;
+    const actionNum = idx;
+    lines.push("");
+    // Find the action label from the first history entry that has this index
+    const actionLabel = entry.actionLabel;
+    lines.push(`Done: ${actionNum}. ${actionLabel}`);
+    lines.push("");
+    lines.push(entry.table);
+    lines.push("");
+  }
+
+  // Remove trailing empty line
+  if (lines[lines.length - 1] === "") {
+    lines.pop();
+  }
+
+  return lines.join("\n");
 }
 
 main();

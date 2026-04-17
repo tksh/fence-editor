@@ -121,8 +121,8 @@ export function resolveFormat(
 /**
  * Generate a default output filename based on the input path and resolved format.
  *
- * - If input is a file: replace or append _edited suffix with the correct extension.
- *   e.g., test/00.dj → test/00_edited.dj, doc.md → doc_edited.md
+ * - If input is a file: replace or append .edits suffix with the correct extension.
+ *   e.g., test/00.dj → test/00.edits.dj, doc.md → doc.edits.md
  * - If input is stdin (null): fall back to edited_output.<ext>
  */
 export function generateDefaultOutputPath(
@@ -143,7 +143,7 @@ export function generateDefaultOutputPath(
   const dotIdx = fileName.lastIndexOf(".");
   const base = dotIdx > 0 ? fileName.slice(0, dotIdx) : fileName;
 
-  return `${dir}${base}_edited${ext}`;
+  return `${dir}${base}.edits${ext}`;
 }
 
 /**
