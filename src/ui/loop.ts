@@ -81,7 +81,7 @@ export async function runInteractiveLoop(
   }
 
   // Show output destination selector
-  renderOutputSelector();
+  renderOutputSelector(state.format);
 
   while (true) {
     const input = await readLine();
@@ -112,7 +112,7 @@ export async function runInteractiveLoop(
       await writeFile(filePath, exportContent);
 
       renderStatusSaveConfirmation(filePath);
-      renderOutputSelector();
+      renderOutputSelector(state.format);
       continue; // Return to save menu for main content export
     }
 
