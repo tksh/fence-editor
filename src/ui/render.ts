@@ -271,7 +271,7 @@ export function renderActions(actions: Action[]): void {
 
   // Persistent hint footer (within 80 chars)
   Deno.stderr.writeSync(
-    out(`\n  ${DIM}> Enter action # | 0 to return to editor | Ctrl+C to cancel${RESET}\n`),
+    out(`\n  ${DIM}> Enter action # | 0 to exit & save | Ctrl+C to cancel${RESET}\n`),
   );
 }
 
@@ -325,4 +325,12 @@ export function renderGoodbye(): void {
  */
 export function renderError(msg: string): void {
   Deno.stderr.writeSync(out(`\n\x1b[31mError: ${msg}\x1b[0m\n`));
+}
+
+/**
+ * Render status save confirmation message.
+ * Written to stderr.
+ */
+export function renderStatusSaveConfirmation(filePath: string): void {
+  Deno.stderr.writeSync(out(`\n${DIM}Saved status table to ${filePath}${RESET}\n`));
 }

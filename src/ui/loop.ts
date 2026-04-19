@@ -15,10 +15,12 @@ import {
   renderOutputSelector,
   renderGoodbye,
   renderError,
+  renderStatusSaveConfirmation,
   generateValidActions,
   clearScreen,
 } from "./render.ts";
-import { readLine } from "../runtime.ts";
+import { readLine, writeFile } from "../runtime.ts";
+import { generateDefaultOutputPath } from "../args.ts";
 
 /** Output destination choice. */
 export type OutputDestination = "save-new" | "overwrite" | "stdout" | "save-status" | "cancel";
@@ -91,11 +93,77 @@ export async function runInteractiveLoop(
     if (trimmed === "1") return { state, destination: "save-new" };
     if (trimmed === "2") return { state, destination: "overwrite" };
     if (trimmed === "3") return { state, destination: "stdout" };
-    if (trimmed === "4") return { state, destination: "save-status" };
     if (trimmed === "0") return { state, destination: "cancel" };
+
+    // Option 4: Save status log inline (auxiliary) and return to save menu
+    if (trimmed === "4") {
+      const defaultName = generateDefaultOutputPath(null, state.format).replace(
+        /_edited\.(md|dj)$/,
+        ".edits.$1",
+      );
+      Deno.stderr.writeSync(
+        new TextEncoder().encode(`Enter file path [${defaultName}]: `),
+      );
+      const pathInput = await readLine();
+      const filePath = pathInput.trim() || defaultName;
+
+      // Generate and save status log
+      const exportContent = generateStatusLogContent(state.statusHistory);
+      await writeFile(filePath, exportContent);
+
+      renderStatusSaveConfirmation(filePath);
+      renderOutputSelector();
+      continue; // Return to save menu for main content export
+    }
 
     renderError("Invalid choice. Enter 1, 2, 3, 4, or 0 to cancel.");
   }
+}
+
+/**
+ * Generate status log content for export.
+ */
+function generateStatusLogContent(
+  statusHistory: Array<{ actionLabel: string; table: string }>,
+): string {
+  const lines: string[] = [];
+
+  lines.push("# Summary of Fence Edits");
+  lines.push("");
+
+  // Applied Actions section
+  lines.push("## Applied Actions");
+  lines.push("");
+  for (const [idx, entry] of statusHistory.entries()) {
+    if (idx === 0) continue; // Skip initial entry
+    const actionNum = idx; // 1-based
+    lines.push(`${actionNum}. ${entry.actionLabel}`);
+  }
+  lines.push("");
+
+  // Status Changes section
+  lines.push("## Status Changes");
+  lines.push("");
+
+  // Initial state
+  lines.push("Initial:");
+  lines.push("");
+  lines.push(statusHistory[0].table);
+  lines.push("");
+
+  // Each action's resulting state as "Done: N. ..."
+  for (const [idx, entry] of statusHistory.entries()) {
+    if (idx === 0) continue;
+    const actionNum = idx;
+    lines.push("");
+    lines.push(`Done: ${actionNum}. ${entry.actionLabel}`);
+    lines.push("");
+    lines.push(entry.table);
+    lines.push("");
+  }
+
+  // Ensure trailing newline
+  return lines.join("\n") + "\n";
 }
 
 /**

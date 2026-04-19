@@ -171,76 +171,7 @@ async function handleOutput(
       );
       break;
     }
-    case "save-status": {
-      clearScreen();
-      renderGoodbye();
-      // Format-aware default output path with .edits extension
-      const defaultName = generateDefaultOutputPath(inputFile, format);
-      Deno.stderr.writeSync(
-        new TextEncoder().encode(`Enter file path [${defaultName}]: `),
-      );
-      const pathInput = await readLine();
-      const filePath = pathInput.trim() || defaultName;
-      // Generate export content
-      const exportContent = generateExportContent(
-        state.statusHistory,
-        state.outputTokens,
-        originalLines,
-      );
-      await writeFile(filePath, exportContent);
-      Deno.stderr.writeSync(
-        new TextEncoder().encode(`Saved status table to ${filePath}\n`),
-      );
-      break;
-    }
   }
-}
-
-function generateExportContent(
-  statusHistory: Array<{ actionLabel: string; table: string }>,
-  outputTokens: any[],
-  originalLines: string[],
-): string {
-  const lines: string[] = [];
-
-  lines.push("# Summary of Fence Edits");
-  lines.push("");
-
-  // Applied Actions section
-  lines.push("## Applied Actions");
-  lines.push("");
-  for (const [idx, entry] of statusHistory.entries()) {
-    if (idx === 0) continue; // Skip initial entry
-    const actionNum = idx; // 1-based
-    lines.push(`${actionNum}. ${entry.actionLabel}`);
-  }
-  lines.push("");
-
-  // Status Changes section
-  lines.push("## Status Changes");
-  lines.push("");
-
-  // Initial state
-  lines.push("Initial:");
-  lines.push("");
-  lines.push(statusHistory[0].table);
-  lines.push("");
-
-  // Each action's resulting state as "Done: N. ..."
-  for (const [idx, entry] of statusHistory.entries()) {
-    if (idx === 0) continue;
-    const actionNum = idx;
-    lines.push("");
-    // Find the action label from the first history entry that has this index
-    const actionLabel = entry.actionLabel;
-    lines.push(`Done: ${actionNum}. ${actionLabel}`);
-    lines.push("");
-    lines.push(entry.table);
-    lines.push("");
-  }
-
-  // Ensure trailing newline
-  return lines.join("\n") + "\n";
 }
 
 main();
