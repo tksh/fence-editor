@@ -97,10 +97,11 @@ export async function runInteractiveLoop(
 
     // Option 4: Save status log inline (auxiliary) and return to save menu
     if (trimmed === "4") {
-      const defaultName = generateDefaultOutputPath(null, state.format).replace(
-        /_edited\.(md|dj)$/,
-        ".edits.$1",
-      );
+      const baseName = generateDefaultOutputPath(null, state.format);
+      // Replace _edited.{ext} with .edits.{ext} for files, or insert .edits for stdin default
+      const defaultName = baseName.includes("_edited.")
+        ? baseName.replace(/_edited\.(md|dj)$/, ".edits.$1")
+        : baseName.replace(/\.(md|dj)$/, ".edits.$1");
       Deno.stderr.writeSync(
         new TextEncoder().encode(`Enter file path [${defaultName}]: `),
       );
