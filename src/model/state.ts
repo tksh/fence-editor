@@ -715,10 +715,8 @@ export function autoAdjustBackticks(tokens: FenceToken[]): FenceToken[] {
 /**
  * Render the status table as a Markdown string for export.
  * This includes the initial table and each action's resulting table.
- * Backtick characters in table cells are escaped as HTML entities.
  */
 function renderStatusTableAsMarkdown(tokens: FenceToken[]): string {
-  const escaped = (s: string) => s.replace(/`/g, '&#96;');
   const lines: string[] = [];
 
   lines.push('| line | input                | I. | O. | output               |');
@@ -734,10 +732,10 @@ function renderStatusTableAsMarkdown(tokens: FenceToken[]): string {
   for (const lineNum of allLines) {
     const token = tokenMap.get(lineNum);
     const lineStr = String(lineNum);
-    const inputRaw = token ? escaped(token.raw) : '';
+    const inputRaw = token ? token.raw : '';
     const inputId = token && token.pairId > 0 ? String(token.pairId) : '';
     const outputId = token && token.pairId > 0 ? String(token.pairId) : '';
-    const outputRaw = token ? escaped(token.raw) : '';
+    const outputRaw = token ? token.raw : '';
 
     lines.push(
       `| ${lineStr.padStart(4)} | ${inputRaw.padEnd(20)} | ${inputId.padStart(2)} | ${outputId.padStart(2)} | ${outputRaw.padEnd(20)} |`,
