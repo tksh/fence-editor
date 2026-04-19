@@ -195,12 +195,17 @@ Choose output destination:
   [2] Overwrite input file
   [3] Print to stdout
 
-  > Enter action # | 0 to return to editor | Ctrl+C to cancel
+Also save a summary of fence edits:
+
+  [4] Save status table as Markdown file
+
+> Enter action # | 0 to return to editor | Ctrl+C to cancel
 ```
 
 - `[1] Save as new file`: 新規ファイルパスの入力を求める。デフォルトは `${base}_edited.<ext>`。
 - `[2] Overwrite input file`: 入力ファイルを上書き。stdin入力時はエラー。
 - `[3] Print to stdout`: 再構築ドキュメントを stdout のみ出力。UIテキストは一切含まない。
+- `[4] Save status table as Markdown file`: 編集ログをMarkdownファイルとして保存。
 - `[0] Cancel`: 保存せずにエディターに戻る。対話ループが再開され、追加のアクション適用が可能。
 
 空の入力は静かに再プロンプト。`1`/`2`/`3`/`0` 以外の数値もエラー表示して再プロンプト。
