@@ -69,12 +69,21 @@ export function parseArgs(argv: string[]): ParsedArgs {
       i++;
     } else if (arg === "--format") {
       const next = argv[i + 1];
-      if (next === "commonmark" || next === "djot") {
-        result.explicitFormat = next;
+      if (next === undefined) {
+        Deno.stderr.writeSync(
+          new TextEncoder().encode("Error: --format requires a value. Supported formats: commonmark, djot\n"),
+        );
+        Deno.exit(2);
+      }
+      const normalized = next.toLowerCase();
+      if (normalized === "commonmark" || normalized === "djot") {
+        result.explicitFormat = normalized as "commonmark" | "djot";
         i += 2;
       } else {
-        // Invalid format value — skip
-        i += 2;
+        Deno.stderr.writeSync(
+          new TextEncoder().encode(`Error: Invalid format "${next}". Supported formats: commonmark, djot\n`),
+        );
+        Deno.exit(2);
       }
     } else if (!arg.startsWith("-")) {
       // Positional argument: input file
