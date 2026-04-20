@@ -1,5 +1,5 @@
 {
-  "name": "@yourname/fence-editor",
+  "name": "@tksh/fence-editor",
   "version": "0.1.0",
   "exports": {
     ".": "./src/cli.ts"
