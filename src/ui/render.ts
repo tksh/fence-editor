@@ -67,13 +67,14 @@ export function clearScreen(): void {
 }
 
 /**
- * Render the complete UI: Terms, format indicator, Status table, Actions, and prompt.
+ * Render the complete UI: Format indicator, Legend, Status table, Actions, and prompt.
  * All UI goes to stderr.
  */
 export function render(state: EditorState): void {
   clearScreen();
 
-  renderTerms(state);
+  renderFormat(state);
+  renderLegend(state);
   renderStatusTable(state);
   const actions = generateValidActions(state);
   renderActions(actions);
@@ -81,25 +82,25 @@ export function render(state: EditorState): void {
 }
 
 /**
- * Render the Terms section explaining I. and O. notation, plus the parser format.
+ * Render the Format indicator at the top of the UI.
  * Written to stderr.
  */
-function renderTerms(state: EditorState): void {
+function renderFormat(state: EditorState): void {
   const formatLabel = state.format === "djot" ? "Djot" : "CommonMark";
-  const lines = [
-    `${BOLD}Terms:${RESET}`,
-    "",
-    `  I. = fence pair id (input)`,
-    `  O. = fence pair id (output)`,
-    "",
-    `Parsed as ${formatLabel}`,
-    "",
-    `${BOLD}Status:${RESET}`,
-    "",
-  ];
-  for (const line of lines) {
-    Deno.stderr.writeSync(out(line + "\n"));
-  }
+  Deno.stderr.writeSync(out(`${BOLD}Format:${RESET} ${formatLabel}\n`));
+  Deno.stderr.writeSync(out("\n"));
+}
+
+/**
+ * Render the Legend section explaining I. and O. notation.
+ * Written to stderr.
+ */
+function renderLegend(state: EditorState): void {
+  Deno.stderr.writeSync(out(`${BOLD}Legend:${RESET}\n`));
+  Deno.stderr.writeSync(out("  I. = fence pair id (input)\n"));
+  Deno.stderr.writeSync(out("  O. = fence pair id (output)\n"));
+  Deno.stderr.writeSync(out("\n"));
+  Deno.stderr.writeSync(out(`${BOLD}Status:${RESET}\n`));
 }
 
 /**
@@ -257,7 +258,6 @@ export function renderActions(actions: Action[]): void {
   Deno.stderr.writeSync(
     out(`${BOLD}Actions:${RESET}\n`),
   );
-  Deno.stderr.writeSync(out("\n"));
 
   if (actions.length === 0) {
     Deno.stderr.writeSync(out("  No actions available.\n"));

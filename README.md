@@ -53,12 +53,11 @@ fence-editor input.md --format djot
 The interactive UI displays:
 
 ```
-Terms:
+Format: CommonMark
 
+Legend:
   I. = fence pair id (input)
   O. = fence pair id (output)
-
-Parsed as CommonMark
 
 Status:
 | line | input                | I. | O. | output               |
@@ -72,7 +71,6 @@ Status:
   O.2: line 5 → line 14 (backtick, 4x)
 
 Actions:
-
   [1] Change close fence for O.1 from line 8 to line 14 (auto-pairs O.2 to line 11)
 
   > Enter action # | 0 to exit & save | Ctrl+C to cancel
