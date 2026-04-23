@@ -115,7 +115,7 @@ Deno.test("pairFences maintains separate stacks for backtick and tilde", () => {
 
 // ─── generateValidActions ───────────────────────────────────────
 
-Deno.test("generateValidActions produces swap action for test/00.md structure", () => {
+Deno.test("generateValidActions produces swap action for test/fixtures/00.md structure", () => {
   const tokens = makeTokens([
     { line: 5 },
     { line: 8 },
@@ -224,7 +224,7 @@ Deno.test("hasCrossSymbolCrossing allows same-symbol crossing", () => {
   assertEquals(hasCrossSymbolCrossing(sameSymbol), false, "Same-symbol pairs are never crossing");
 });
 
-Deno.test("test/02.md: restructure blocked by cross-symbol boundary rule", () => {
+Deno.test("test/fixtures/02.md: restructure blocked by cross-symbol boundary rule", () => {
   // O.1=(5,14) backtick, O.2=(8,11) tilde, O.3=(18,21) tilde
   // Swapping O.2↔O.3 would create tilde (8,21) crossing backtick (5,14)
   const tokens = [
@@ -251,7 +251,7 @@ Deno.test("test/02.md: restructure blocked by cross-symbol boundary rule", () =>
   assert(convertAction, "Convert-tilde action should still be available");
 });
 
-Deno.test("test/02.md: after convert-tilde, restructure suppressed for one frame", () => {
+Deno.test("test/fixtures/02.md: after convert-tilde, restructure suppressed for one frame", () => {
   // After converting tilde to backtick, all pairs are backticks.
   // However, restructure actions are suppressed for one frame to prevent
   // immediately suggesting merges of previously-separate blocks.
@@ -290,9 +290,9 @@ Deno.test("test/02.md: after convert-tilde, restructure suppressed for one frame
   );
 });
 
-Deno.test("test/02.md: after restructure following conversion, restructure allowed again", () => {
+Deno.test("test/fixtures/02.md: after restructure following conversion, restructure allowed again", () => {
   // After a restructure action is applied, skipRestructure is cleared.
-  // Use test/00.md pattern: two separate pairs (5,8) and (11,14).
+  // Use test/fixtures/00.md pattern: two separate pairs (5,8) and (11,14).
   const tokens = makeTokens([
     { line: 5 },
     { line: 8 },
@@ -455,7 +455,7 @@ Deno.test("applyAction convert-tilde is atomic with auto-adjustment", () => {
   assertEquals(newState.hasTilde, false, "hasTilde should be false");
 });
 
-Deno.test("applyAction convert-tilde works on test/02.md-like structure", () => {
+Deno.test("applyAction convert-tilde works on test/fixtures/02.md-like structure", () => {
   // O.1=(5,14) backtick, O.2=(8,11) tilde, O.3=(18,21) tilde
   // After conversion: O.2 nested inside O.1, so O.1 count → 4
   const tokens = makeTokens([

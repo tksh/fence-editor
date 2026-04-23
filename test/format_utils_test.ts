@@ -18,7 +18,7 @@ Deno.test("resolveFormat: explicit flag takes priority", () => {
 });
 
 Deno.test("resolveFormat: auto-detects .dj as djot", () => {
-  assertEquals(resolveFormat("test/00.dj", undefined), "djot");
+  assertEquals(resolveFormat("test/fixtures/00.dj", undefined), "djot");
   assertEquals(resolveFormat("notes.dj", undefined), "djot");
 });
 
@@ -62,8 +62,8 @@ Deno.test("generateDefaultOutputPath: .md input → .edits.md", () => {
 Deno.test("generateDefaultOutputPath: .dj input → .edits.dj", () => {
   assertEquals(generateDefaultOutputPath("notes.dj", "djot"), "notes.edits.dj");
   assertEquals(
-    generateDefaultOutputPath("test/00.dj", "djot"),
-    "test/00.edits.dj",
+    generateDefaultOutputPath("test/fixtures/00.dj", "djot"),
+    "test/fixtures/00.edits.dj",
   );
 });
 

@@ -12,10 +12,10 @@ import {
 } from "../src/model/state.ts";
 import { assertEquals, assert } from "https://deno.land/std@0.224.0/assert/mod.ts";
 
-const source = await Deno.readTextFile("test/00.md");
+const source = await Deno.readTextFile("test/fixtures/00.md");
 const originalLines = source.split("\n");
 
-Deno.test("integration: test/00.md swap action produces correct nested output", () => {
+Deno.test("integration: test/fixtures/00.md swap action produces correct nested output", () => {
   const tokens = parseCommonMark(source);
   const state = createEditorState(tokens);
 

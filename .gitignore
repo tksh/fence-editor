@@ -1,2 +1,7 @@
 # Qwen Code
 .qwen/
+
+# Test artifacts
+test/fixtures/*_edited.*
+test/fixtures/*.edits.*
+test/fixtures/edited_output.*
