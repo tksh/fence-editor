@@ -10,15 +10,7 @@
 
 import type { EditorState } from "../model/state.ts";
 import { applyAction } from "../model/state.ts";
-import {
-  render,
-  renderOutputSelector,
-  renderGoodbye,
-  renderError,
-  renderStatusSaveConfirmation,
-  generateValidActions,
-  clearScreen,
-} from "./render.ts";
+import { clearScreen, generateValidActions, render, renderError, renderGoodbye, renderOutputSelector, renderStatusSaveConfirmation } from "./render.ts";
 import { readLine, writeFile } from "../runtime.ts";
 import { generateDefaultOutputPath } from "../args.ts";
 
@@ -99,9 +91,7 @@ export async function runInteractiveLoop(
     if (trimmed === "4") {
       const baseName = generateDefaultOutputPath(null, state.format);
       // Replace _edited.{ext} with .edits.{ext} for files, or insert .edits for stdin default
-      const defaultName = baseName.includes("_edited.")
-        ? baseName.replace(/_edited\.(md|dj)$/, ".edits.$1")
-        : baseName.replace(/\.(md|dj)$/, ".edits.$1");
+      const defaultName = baseName.includes("_edited.") ? baseName.replace(/_edited\.(md|dj)$/, ".edits.$1") : baseName.replace(/\.(md|dj)$/, ".edits.$1");
       Deno.stderr.writeSync(
         new TextEncoder().encode(`Enter file path [${defaultName}]: `),
       );

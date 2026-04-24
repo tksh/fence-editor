@@ -7,5 +7,14 @@
   "imports": {
     "micromark": "npm:micromark@^3.0.0",
     "@djot/djot": "npm:@djot/djot@^0.3.0"
+  },
+  "fmt": {
+    "exclude": ["test/fixtures/"],
+    "singleQuote": false,
+    "lineWidth": 100000,
+    "indentWidth": 2,
+    "useTabs": false,
+    "semiColons": true,
+    "proseWrap": "preserve"
   }
 }

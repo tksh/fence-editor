@@ -2,11 +2,7 @@
  * Unit tests for auto-detect and format-aware output path generation.
  */
 
-import {
-  resolveFormat,
-  generateDefaultOutputPath,
-  parseArgs,
-} from "../src/args.ts";
+import { generateDefaultOutputPath, parseArgs, resolveFormat } from "../src/args.ts";
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 
 // ─── resolveFormat ───────────────────────────────────────────────

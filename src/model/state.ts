@@ -370,8 +370,7 @@ export function generateValidActions(state: EditorState): Action[] {
 
         actions.push({
           id: 0,
-          label:
-            `Change close fence for O.${A.id} from line ${A.close.line} to line ${B.close.line} (auto-pairs O.${B.id} to line ${B.open.line})`,
+          label: `Change close fence for O.${A.id} from line ${A.close.line} to line ${B.close.line} (auto-pairs O.${B.id} to line ${B.open.line})`,
           type: "restructure",
           pairId: A.id,
           newCloseLine: B.close.line,
@@ -395,8 +394,7 @@ export function generateValidActions(state: EditorState): Action[] {
 
         actions.push({
           id: 0,
-          label:
-            `Change close fence for O.${pair.id} from line ${pair.close.line} to line ${candidate.line}`,
+          label: `Change close fence for O.${pair.id} from line ${pair.close.line} to line ${candidate.line}`,
           type: "restructure",
           pairId: pair.id,
           newCloseLine: candidate.line,
@@ -719,8 +717,8 @@ export function autoAdjustBackticks(tokens: FenceToken[]): FenceToken[] {
 function renderStatusTableAsMarkdown(tokens: FenceToken[]): string {
   const lines: string[] = [];
 
-  lines.push('| line | input                | I. | O. | output               |');
-  lines.push('|-----:|:---------------------|---:|---:|:---------------------|');
+  lines.push("| line | input                | I. | O. | output               |");
+  lines.push("|-----:|:---------------------|---:|---:|:---------------------|");
 
   const tokenMap = new Map<number, FenceToken>();
   for (const t of tokens) {
@@ -732,15 +730,15 @@ function renderStatusTableAsMarkdown(tokens: FenceToken[]): string {
   for (const lineNum of allLines) {
     const token = tokenMap.get(lineNum);
     const lineStr = String(lineNum);
-    const inputRaw = token ? token.raw : '';
-    const inputId = token && token.pairId > 0 ? String(token.pairId) : '';
-    const outputId = token && token.pairId > 0 ? String(token.pairId) : '';
-    const outputRaw = token ? token.raw : '';
+    const inputRaw = token ? token.raw : "";
+    const inputId = token && token.pairId > 0 ? String(token.pairId) : "";
+    const outputId = token && token.pairId > 0 ? String(token.pairId) : "";
+    const outputRaw = token ? token.raw : "";
 
     lines.push(
       `| ${lineStr.padStart(4)} | ${inputRaw.padEnd(20)} | ${inputId.padStart(2)} | ${outputId.padStart(2)} | ${outputRaw.padEnd(20)} |`,
     );
   }
 
-  return lines.join('\n');
+  return lines.join("\n");
 }

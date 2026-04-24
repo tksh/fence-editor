@@ -160,9 +160,7 @@ export function generateDefaultOutputPath(
  * Returns empty string if no extension is present.
  */
 function getFileExtension(path: string): string {
-  const fileName = path.includes("/")
-    ? path.slice(path.lastIndexOf("/") + 1)
-    : path;
+  const fileName = path.includes("/") ? path.slice(path.lastIndexOf("/") + 1) : path;
   const dotIdx = fileName.lastIndexOf(".");
   return dotIdx > 0 ? fileName.slice(dotIdx + 1) : "";
 }

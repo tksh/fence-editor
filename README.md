@@ -42,17 +42,17 @@ fence-editor input.md --format djot
 
 ## CLI Options
 
-| Option | Description |
-|---|---|
+| Option                        | Description                                                                                                                            |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | `--format <commonmark\|djot>` | Set parser format (default: auto-detect from extension). Accepts only lowercase `commonmark` or `djot`; exits with an error otherwise. |
-| `--version` | Show version information |
-| `-h, --help` | Show help |
+| `--version`                   | Show version information                                                                                                               |
+| `-h, --help`                  | Show help                                                                                                                              |
 
 ## UI Overview
 
 The interactive UI displays:
 
-```
+`````txt
 Format: CommonMark
 
 Legend:
@@ -74,7 +74,7 @@ Actions:
   [1] Change close fence for O.1 from line 8 to line 14 (auto-pairs O.2 to line 11)
 
   > Enter action # | 0 to exit & save | Ctrl+C to cancel
-```
+`````
 
 - **I.** shows the pair IDs from the original parsed input (immutable)
 - **O.** shows the current pair IDs after applying edits (live)

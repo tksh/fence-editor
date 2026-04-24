@@ -15,23 +15,14 @@
  * - ONLY reconstructed file content (destination [3]) → stdout
  */
 
-import {
-  parseArgs,
-  getVersion,
-  getHelpText,
-  resolveFormat,
-  generateDefaultOutputPath,
-} from "./args.ts";
-import { getArgs, readStdin, readLine, exit, writeFile } from "./runtime.ts";
+import { generateDefaultOutputPath, getHelpText, getVersion, parseArgs, resolveFormat } from "./args.ts";
+import { exit, getArgs, readLine, readStdin, writeFile } from "./runtime.ts";
 import { parseCommonMark } from "./parser/commonmark.ts";
 import { parseDjot } from "./parser/djot.ts";
 import type { FenceParser } from "./model/fence.ts";
-import { createEditorState, reconstructOutput, type EditorState } from "./model/state.ts";
-import {
-  runInteractiveLoop,
-  type OutputDestination,
-} from "./ui/loop.ts";
-import { clearScreen, renderGoodbye, renderError } from "./ui/render.ts";
+import { createEditorState, type EditorState, reconstructOutput } from "./model/state.ts";
+import { type OutputDestination, runInteractiveLoop } from "./ui/loop.ts";
+import { clearScreen, renderError, renderGoodbye } from "./ui/render.ts";
 
 async function main(): Promise<void> {
   // 1. Parse CLI arguments
@@ -82,9 +73,7 @@ async function main(): Promise<void> {
   const originalLines = source.split("\n");
 
   // 3. Select parser
-  const parser: FenceParser = resolvedFormat === "djot"
-    ? parseDjot
-    : parseCommonMark;
+  const parser: FenceParser = resolvedFormat === "djot" ? parseDjot : parseCommonMark;
 
   // 4. Parse fences and create editor state
   const tokens = parser(source);

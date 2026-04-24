@@ -7,7 +7,7 @@
  */
 
 import { micromark } from "micromark";
-import type { FenceToken, FenceParser } from "../model/fence.ts";
+import type { FenceParser, FenceToken } from "../model/fence.ts";
 import { truncate } from "../model/fence.ts";
 import { pairFences } from "../model/state.ts";
 

@@ -2,19 +2,9 @@
  * Unit tests for generateValidActions, applyAction, and pairFences.
  */
 
-import {
-  createEditorState,
-  generateValidActions,
-  applyAction,
-  pairFences,
-  reconstructOutput,
-  getOutputPairs,
-  autoAdjustBackticks,
-  hasCrossSymbolCrossing,
-  type EditorState,
-} from "../src/model/state.ts";
+import { applyAction, autoAdjustBackticks, createEditorState, type EditorState, generateValidActions, getOutputPairs, hasCrossSymbolCrossing, pairFences, reconstructOutput } from "../src/model/state.ts";
 import type { FenceToken } from "../src/model/fence.ts";
-import { assertEquals, assert } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 
 // Helper: create tokens manually (bypassing parser)
 // Defaults mimic the parser: infostring → "open", no infostring → "close"

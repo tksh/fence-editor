@@ -3,7 +3,7 @@
  * UI goes to stderr, data goes to stdout.
  */
 
-import { assertEquals, assert } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 
 Deno.test("verify: render functions write to stderr, not stdout", async () => {
   // Capture stderr and stdout separately

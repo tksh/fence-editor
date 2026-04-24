@@ -29,11 +29,7 @@
  */
 
 import type { EditorState } from "../model/state.ts";
-import {
-  generateValidActions,
-  type Action,
-  getOutputPairs,
-} from "../model/state.ts";
+import { type Action, generateValidActions, getOutputPairs } from "../model/state.ts";
 import type { FenceToken } from "../model/fence.ts";
 import { truncate } from "../model/fence.ts";
 
@@ -142,19 +138,13 @@ function renderStatusTable(state: EditorState): void {
 
     const lineStr = String(lineNum);
     const inputRaw = inputToken ? truncate(inputToken.raw, COL_INPUT_W) : "";
-    const inputId = inputToken && inputToken.pairId > 0
-      ? String(inputToken.pairId)
-      : "";
+    const inputId = inputToken && inputToken.pairId > 0 ? String(inputToken.pairId) : "";
 
     // O. column: reads directly from state.outputTokens[i].pairId
-    const outputId = outputToken && outputToken.pairId > 0
-      ? String(outputToken.pairId)
-      : "";
+    const outputId = outputToken && outputToken.pairId > 0 ? String(outputToken.pairId) : "";
 
     // output column: reads directly from state.outputTokens[i].raw
-    const outputRaw = outputToken
-      ? truncate(outputToken.raw, COL_OUTPUT_W)
-      : "";
+    const outputRaw = outputToken ? truncate(outputToken.raw, COL_OUTPUT_W) : "";
 
     const row = formatRow(
       lineStr,
@@ -247,7 +237,7 @@ function padRight(s: string, width: number): string {
 /**
  * Re-export Action and generateValidActions for consumers (loop.ts)
  */
-export { generateValidActions, type Action };
+export { type Action, generateValidActions };
 
 /**
  * Render the Actions section with numbered choices.
