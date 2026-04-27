@@ -15,4 +15,4 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: denoland/setup-deno@v2
-      - run: deno publish
+      - run: deno publish --set-version ${{ github.ref_name }}
