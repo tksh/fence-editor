@@ -91,7 +91,7 @@ function renderFormat(state: EditorState): void {
  * Render the Legend section explaining I. and O. notation.
  * Written to stderr.
  */
-function renderLegend(state: EditorState): void {
+function renderLegend(_state: EditorState): void {
   Deno.stderr.writeSync(out(`${BOLD}Legend:${RESET}\n`));
   Deno.stderr.writeSync(out("  I. = fence pair id (input)\n"));
   Deno.stderr.writeSync(out("  O. = fence pair id (output)\n"));

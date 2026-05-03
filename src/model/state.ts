@@ -9,7 +9,6 @@
  */
 
 import type { FenceToken } from "./fence.ts";
-import { truncate } from "./fence.ts";
 
 // ─── EditorState ────────────────────────────────────────────────
 

@@ -111,14 +111,17 @@ async function main(): Promise<void> {
  *
  * ONLY destination [3] "stdout" writes to DENO.STDOUT.
  * All other messages (goodbye, errors, confirmations) go to STDERR.
+ *
+ * @param _state - Reserved for future extensions (e.g., diff display, state-aware metadata output)
+ * @param _originalLines - Reserved for future extensions (e.g., diff display, state-aware metadata output)
  */
 async function handleOutput(
   destination: OutputDestination,
   output: string,
   inputFile: string | null,
   format: "commonmark" | "djot",
-  state: EditorState,
-  originalLines: string[],
+  _state: EditorState,
+  _originalLines: string[],
 ): Promise<void> {
   switch (destination) {
     case "stdout": {

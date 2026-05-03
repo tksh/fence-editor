@@ -4,7 +4,7 @@
 
 import { parseCommonMark } from "../src/parser/commonmark.ts";
 import { applyAction, createEditorState, generateValidActions, getOutputPairs, reconstructOutput } from "../src/model/state.ts";
-import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { assert, assertEquals } from "@std/assert";
 
 const source = await Deno.readTextFile("test/fixtures/00.md");
 const originalLines = source.split("\n");

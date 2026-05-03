@@ -4,7 +4,7 @@
 
 import { parseCommonMark } from "../src/parser/commonmark.ts";
 import { applyAction, autoAdjustBackticks, createEditorState, generateValidActions, getOutputPairs, reconstructOutput } from "../src/model/state.ts";
-import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { assert, assertEquals } from "@std/assert";
 
 // ─── Tilde-only test file ───────────────────────────────────────
 const TILDE_SOURCE = `~~~js

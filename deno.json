@@ -5,7 +5,8 @@
   },
   "imports": {
     "micromark": "npm:micromark@^3.0.0",
-    "@djot/djot": "npm:@djot/djot@^0.3.0"
+    "@djot/djot": "npm:@djot/djot@^0.3.0",
+    "@std/assert": "https://deno.land/std@0.224.0/assert/mod.ts"
   },
   "fmt": {
     "exclude": ["test/fixtures/"],

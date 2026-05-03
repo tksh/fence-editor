@@ -3,7 +3,7 @@
  */
 
 import { generateDefaultOutputPath, parseArgs, resolveFormat } from "../src/args.ts";
-import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { assertEquals } from "@std/assert";
 
 // ─── resolveFormat ───────────────────────────────────────────────
 
